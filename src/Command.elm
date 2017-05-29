@@ -77,6 +77,7 @@ manString =
                    the parentheses can contain any valid expression that
                    does not use spawn, with the pipe symbol `|` replaced by `!`
   kill [string]  - kill process
+  [cmd] | [cmd]  - combine commands by piping stdout to stdin
 """ |> String.Extra.replace " " "\x2002"
 
 
