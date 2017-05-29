@@ -29,7 +29,7 @@ init =
             List.foldl f emptySystem files
 
         daemons =
-            [ { daemon = catDaemon "hello", name = "kitty", lifetime = 100 } ]
+            [ { daemon = catDaemon "hel" "lo", name = "kitty", lifetime = 100 } ]
     in
         { history = []
         , buffer =
@@ -40,14 +40,15 @@ init =
 
 
 type alias Model =
-    { history : List Entry
+    { history : List (Entry String)
     , system : FileSystem String
     , buffer : String
     }
 
 
-type alias Entry =
-    { input : String, output : String }
+type Entry a
+    = Input a
+    | Output a
 
 
 
@@ -65,37 +66,16 @@ update msg model =
     case msg of
         Tick time ->
             let
-                ( streams, system_, daemons_ ) =
+                ( streams, system, _ ) =
                     updateDaemons 1 model.system model.system.daemons
 
-                output =
-                    streams
-                        |> List.filter ((/=) "")
-                        |> String.join "\n"
-
-                entry =
-                    { input = "daemons speak", output = output }
-
-                addHistory model =
-                    if output == "" then
-                        model
-                    else
-                        { model | history = entry :: model.history }
+                history =
+                    (printDaemonOutput streams) ++ model.history
             in
-                if List.isEmpty model.system.daemons then
-                    model ! []
-                else
-                    ({ model
-                        | system = system_
-                     }
-                        |> addHistory
-                    )
-                        ! []
+                ({ model | system = system, history = history }) ! []
 
         KeyPress key ->
-            model.buffer
-                |> updateBuffer key
-                |> (\x -> { model | buffer = x } ! [])
+            { model | buffer = updateBuffer key model.buffer } ! []
 
         KeyDown key ->
             case key of
@@ -103,19 +83,17 @@ update msg model =
                     update (KeyPress key) model
 
                 13 ->
-                    model.buffer
-                        |> (\x -> execute x model.system)
-                        |> (\( stdout, sys ) ->
-                                { model
-                                    | history = { input = model.buffer, output = stdout } :: model.history
-                                    , system = sys
-                                    , buffer = ""
-                                }
-                                    ! []
-                           )
+                    let
+                        ( stdout, system ) =
+                            execute model.buffer model.system
+
+                        history =
+                            Output stdout :: Input model.buffer :: model.history
+                    in
+                        { model | history = history, system = system, buffer = "" } ! []
 
                 _ ->
-                    model ! []
+                    { model | buffer = updateBufferDown key model.buffer model.history } ! []
 
 
 updateBuffer : KeyCode -> String -> String
@@ -131,6 +109,32 @@ updateBuffer key buffer =
             key |> Char.fromCode |> String.fromChar |> (++) buffer
 
 
+updateBufferDown : Int -> String -> List (Entry String) -> String
+updateBufferDown key buffer history =
+    case key of
+        38 ->
+            let
+                isInput x =
+                    case x of
+                        Input s ->
+                            Just s
+
+                        _ ->
+                            Nothing
+            in
+                history
+                    |> List.filterMap isInput
+                    |> List.filter (String.startsWith buffer)
+                    |> List.head
+                    |> Maybe.withDefault buffer
+
+        40 ->
+            ""
+
+        _ ->
+            buffer
+
+
 
 -- VIEW
 
@@ -140,14 +144,28 @@ cursor =
     String.fromChar '█'
 
 
+prompt : String
+prompt =
+    "$ "
+
+
 view : Model -> Html.Html Msg
 view model =
     let
+        emptyOutput s =
+            case s of
+                Output "" ->
+                    True
+
+                _ ->
+                    False
+
         history =
-            { input = model.buffer ++ cursor, output = "" }
+            Input (model.buffer ++ cursor)
                 :: model.history
                 |> List.reverse
-                |> List.map (printEntry "$ ")
+                |> List.filter (not << emptyOutput)
+                |> List.map (printEntry prompt)
                 |> String.join "\n"
 
         mainStyle =
@@ -156,12 +174,30 @@ view model =
         div [ styles mainStyle ] [ breakText history ]
 
 
-printEntry : String -> Entry -> String
-printEntry prompt { input, output } =
-    if output == "" then
-        prompt ++ input
-    else
-        [ prompt ++ input, output ] |> String.join "\n"
+printDaemonOutput : List String -> List (Entry String)
+printDaemonOutput streams =
+    let
+        screams =
+            streams
+                |> List.filter ((/=) "")
+                |> List.map Output
+    in
+        case screams of
+            [] ->
+                []
+
+            xs ->
+                Output "--- daemons speak ---" :: xs |> List.reverse
+
+
+printEntry : String -> Entry String -> String
+printEntry prompt entry =
+    case entry of
+        Input s ->
+            prompt ++ s
+
+        Output s ->
+            s
 
 
 breakText : String -> Html.Html msg

@@ -34,6 +34,7 @@ parse input =
             , matchCommandArity0 "^ls$" lsCwd
             , matchCommandArity0 "^l$" lsCwd
             , matchCommandArity0 "^pwd$" pwd
+            , matchCommandArity0 "^help$" man
             , matchCommandArity0 "^cd\\s+\\.\\.$" cdUp
             , matchCommandArity1 "^ls\\s+([\\w|\\.|/]+)" ls
             , matchCommandArity1 "^cd\\s+([\\w|\\.|/]+)" cd
@@ -54,6 +55,29 @@ parse input =
             |> Maybe.Extra.traverse ((flip traverse2) commands)
             |> Maybe.map (List.Extra.foldl1 join)
             |> Maybe.withDefault Nothing
+
+
+manString : String
+manString =
+    """
+  help           - print help to stdout
+  l              - show directory contents
+  ls             - show directory contents
+  pwd            - print working directory
+  cd [directory] - change directory
+  echo [string]  - send text to stdout
+  cat [file]     - send file contents to stdout
+  write [file]   - write stdin to file, if file doesn't exist
+  append [file]  - append stdin to file, if file exists
+  daemons        - show running processes
+  spawn [int] [string] (expr)
+                 - create a process, e.g.,
+                     (spawn 10 nuisance (echo blah))
+                     (spawn 1 catWriter (echo cat ! append hello))
+                   the parentheses can contain any valid expression that
+                   does not use spawn, with the pipe symbol `|` replaced by `!`
+  kill [string]  - kill process
+""" |> String.Extra.replace " " "\x2002"
 
 
 execute : String -> FileSystem String -> ( String, FileSystem String )
@@ -81,7 +105,8 @@ type alias DaemonPipe a =
 
 {-| Daemons act on FileSystem sequentially. Weird as they have access to daemon
 list within FileSystem, but any changes to it are discarded at the end of the
-update (can't delete each other).
+update (can't delete each other). One fix is to Daemon a u with the filesystem
+as a parameter but postponing for now.
 -}
 updateDaemons : Int -> FileSystem a -> List (MetaDaemon a) -> DaemonPipe a
 updateDaemons cycles system daemons =
@@ -110,18 +135,18 @@ updateDaemon cycles meta ( stream, system, daemons ) =
                     ( stream_ :: stream, system_, daemons )
 
 
-{-| Creates its own replacement.
+{-|
 -}
-catDaemon : Name -> Daemon String
-catDaemon name =
+catDaemon : Name -> String -> Daemon String
+catDaemon name content =
     let
         innerDaemon system =
             let
                 ( stream_, system_ ) =
-                    (append name) "cat" system |> Result.withDefault ( "", system )
+                    (append name) content system |> Result.withDefault ( "", system )
 
                 daemonSpawn =
-                    catDaemon name
+                    catDaemon name content
             in
                 ( stream_, system_, Just daemonSpawn )
     in
@@ -196,6 +221,11 @@ pwd _ system =
 echo : String -> IOCommand String
 echo x _ system =
     Result.Ok ( x, system )
+
+
+man : IOCommand String
+man _ system =
+    Result.Ok ( manString, system )
 
 
 {-| Ignores stdin.
