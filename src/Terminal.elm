@@ -29,7 +29,7 @@ init =
             List.foldl f emptySystem files
 
         daemons =
-            [ { daemon = catDaemon "hel" "lo", name = "kitty", lifetime = 100 } ]
+            [ { daemon = catDaemon "/usr/litter" "lo", name = "kitty", lifetime = 100 } ]
     in
         { history = []
         , buffer =

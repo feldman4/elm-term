@@ -17,6 +17,7 @@ main =
 files : List String
 files =
     [ "/usr/bin/"
+    , "/usr/litter"
     , "/usr/profile"
     , "/lib/so"
     , "/hello"
