@@ -3,8 +3,9 @@ module Command exposing (..)
 import FileSystem exposing (..)
 import Html exposing (text)
 import List.Extra
-import Regex exposing (Regex)
 import Maybe.Extra
+import Regex exposing (Regex)
+import String.Extra
 
 
 {-| Mimics UNIX command line.
@@ -28,18 +29,23 @@ parse : String -> Maybe (IOCommand String)
 parse input =
     let
         commands =
-            [ matchCommandArity0 "^$" doNothing
+            [ -- navigate
+              matchCommandArity0 "^$" doNothing
             , matchCommandArity0 "^ls$" lsCwd
             , matchCommandArity0 "^l$" lsCwd
             , matchCommandArity0 "^pwd$" pwd
             , matchCommandArity0 "^cd\\s+\\.\\.$" cdUp
-            , matchCommandArity1 "echo\\s+(.*)" echo
-            , matchCommandArity1 "cat\\s+([\\w|\\.|/]+)" cat
-            , matchCommandArity1 "write\\s+([\\w|\\.|/]+)" write
-            , matchCommandArity1 "append\\s+([\\w|\\.|/]+)" append
-            , matchCommandArity1 "ls\\s+([\\w|\\.|/]+)" ls
-            , matchCommandArity1 "cd\\s+([\\w|\\.|/]+)" cd
+            , matchCommandArity1 "^ls\\s+([\\w|\\.|/]+)" ls
+            , matchCommandArity1 "^cd\\s+([\\w|\\.|/]+)" cd
+              -- manipulate files
+            , matchCommandArity1 "^echo\\s+(.*)" echo
+            , matchCommandArity1 "^cat\\s+([\\w|\\.|/]+)" cat
+            , matchCommandArity1 "^write\\s+([\\w|\\.|/]+)" write
+            , matchCommandArity1 "^append\\s+([\\w|\\.|/]+)" append
+              -- daemons
             , matchCommandArity0 "^daemons$" showDaemons
+            , matchCommandArity1 "^kill\\s+([\\w|\\.|/]+)" kill
+            , matchCommandArity3 "^spawn\\s+([0-9]+)\\s+(\\w+)\\s+\\(\\s*(.*?)\\s*\\)" spawn
             ]
     in
         input
@@ -70,48 +76,56 @@ execute input system =
 
 
 type alias DaemonPipe a =
-    ( List a, FileSystem a, List (Daemon a) )
+    ( List a, FileSystem a, List (MetaDaemon a) )
 
 
-updateDaemons : Int -> FileSystem a -> List (Daemon a) -> DaemonPipe a
+{-| Daemons act on FileSystem sequentially. Weird as they have access to daemon
+list within FileSystem, but any changes to it are discarded at the end of the
+update (can't delete each other).
+-}
+updateDaemons : Int -> FileSystem a -> List (MetaDaemon a) -> DaemonPipe a
 updateDaemons cycles system daemons =
     let
         ( streams, system_, daemons_ ) =
             List.foldl (updateDaemon cycles) ( [], system, [] ) daemons
     in
-        ( streams, { system_ | daemons = daemons_ }, [] )
+        ( streams, { system_ | daemons = List.reverse daemons_ }, [] )
 
 
-updateDaemon : Int -> Daemon a -> DaemonPipe a -> DaemonPipe a
-updateDaemon cycles (Daemon _ _ daemon) ( stream, system, daemons ) =
-    case daemon cycles system of
-        ( stream_, system_, Just daemon_ ) ->
-            ( stream_ :: stream, system_, daemon_ :: daemons )
+updateDaemon : Int -> MetaDaemon a -> DaemonPipe a -> DaemonPipe a
+updateDaemon cycles meta ( stream, system, daemons ) =
+    if meta.lifetime == 0 then
+        -- delete daemon
+        ( stream, system, daemons )
+    else
+        let
+            unpack =
+                (\(Daemon d) -> d)
+        in
+            case (unpack meta.daemon) system of
+                ( stream_, system_, Just daemon_ ) ->
+                    ( stream_ :: stream, system_, { meta | daemon = daemon_, lifetime = meta.lifetime - cycles } :: daemons )
 
-        ( stream_, system_, Nothing ) ->
-            ( stream_ :: stream, system_, daemons )
+                ( stream_, system_, Nothing ) ->
+                    ( stream_ :: stream, system_, daemons )
 
 
 {-| Creates its own replacement.
-TODO: eliminate double lifetime
 -}
-catDaemon : Int -> String -> Daemon String
-catDaemon cycles name =
-    if cycles <= 0 then
-        Daemon ("cat:" ++ name) 0 (\cycles_ system -> ( "", system, Nothing ))
-    else
-        let
-            innerDaemon elapsed system =
-                let
-                    ( stream_, system_ ) =
-                        (append name) "cat" system |> Result.withDefault ( "", system )
+catDaemon : Name -> Daemon String
+catDaemon name =
+    let
+        innerDaemon system =
+            let
+                ( stream_, system_ ) =
+                    (append name) "cat" system |> Result.withDefault ( "", system )
 
-                    daemonSpawn =
-                        catDaemon (cycles - elapsed) name
-                in
-                    ( stream_, system_, Just daemonSpawn )
-        in
-            Daemon ("cat:" ++ name) cycles innerDaemon
+                daemonSpawn =
+                    catDaemon name
+            in
+                ( stream_, system_, Just daemonSpawn )
+    in
+        Daemon innerDaemon
 
 
 
@@ -206,15 +220,81 @@ append name stream system =
         |> Result.map (\x -> ( "", unsafeAddFile name (x ++ stream) system ))
 
 
+kill : Name -> IOCommand String
+kill daemonName stream system =
+    let
+        target =
+            (\{ name } -> name == daemonName)
+    in
+        if List.any target system.daemons then
+            let
+                system_ =
+                    { system | daemons = List.filter (not << target) system.daemons }
+            in
+                Result.Ok ( "killed " ++ daemonName, system_ )
+        else
+            Result.Err ("no daemons around named " ++ daemonName)
+
+
+{-| Parse parenthesized input, handling errors etc.
+-}
+spawn : String -> String -> String -> IOCommand String
+spawn lifetime daemonName input stream system =
+    let
+        parseResult n =
+            input
+                |> String.Extra.replace "!" "|"
+                |> parse
+                |> Result.fromMaybe ("failed to parse command " ++ input)
+                |> Result.map (makeDaemon n)
+
+        stdin =
+            ""
+
+        innerDaemon : IOCommand String -> (FileSystem String -> ( String, FileSystem String, Maybe (Daemon String) ))
+        innerDaemon command system_ =
+            let
+                ( stream_, system__ ) =
+                    command stdin system_ |> Result.withDefault ( "", system_ )
+            in
+                ( stream_, system__, Just (Daemon (innerDaemon command)) )
+
+        makeDaemon lifetime_ command =
+            { lifetime = lifetime_
+            , name = daemonName
+            , daemon = Daemon (innerDaemon command)
+            }
+
+        registerDaemon daemon =
+            Result.Ok ( stream, { system | daemons = (Debug.log "new d" daemon) :: system.daemons } )
+    in
+        String.toInt (Debug.log "l" lifetime)
+            |> Result.mapError (\_ -> "lifetime " ++ lifetime ++ "is not an int")
+            |> Result.andThen parseResult
+            |> Result.andThen registerDaemon
+
+
 showDaemons : IOCommand String
 showDaemons stream system =
     let
-        format (Daemon name lifetime _) =
+        format { name, lifetime } =
             (toString lifetime) ++ " " ++ name
+
+        plural n =
+            if n == 1 then
+                ""
+            else
+                "s"
+
+        header =
+            List.length system.daemons
+                |> (\n -> ( toString n, plural n ))
+                |> (\( n, s ) -> "---  " ++ n ++ " active daemon" ++ s ++ "  ---\n")
     in
         system.daemons
             |> List.map format
             |> String.join "\n"
+            |> (++) header
             |> (\x -> Result.Ok ( x, system ))
 
 
@@ -240,6 +320,21 @@ matchCommandArity1 pattern command input =
             case submatches of
                 (Just a) :: [] ->
                     Just (command a)
+
+                _ ->
+                    Nothing
+
+        _ ->
+            Nothing
+
+
+matchCommandArity3 : String -> (String -> String -> String -> IOCommand a) -> String -> Maybe (IOCommand a)
+matchCommandArity3 pattern command input =
+    case Regex.find (Regex.AtMost 1) (Regex.regex pattern) (Debug.log "input" input) of
+        { submatches } :: _ ->
+            case submatches of
+                (Just a) :: (Just b) :: (Just c) :: [] ->
+                    Just (command a b c)
 
                 _ ->
                     Nothing

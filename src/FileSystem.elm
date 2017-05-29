@@ -109,13 +109,15 @@ type alias FileSystem a =
 
 
 type alias Daemonic a =
-    { daemons : List (Daemon a) }
+    { daemons : List (MetaDaemon a) }
 
 
-{-| bad, two sources of truth for lifetime.
--}
+type alias MetaDaemon a =
+    { daemon : Daemon a, lifetime : Int, name : String }
+
+
 type Daemon a
-    = Daemon String Int (Int -> FileSystem a -> ( a, FileSystem a, Maybe (Daemon a) ))
+    = Daemon (FileSystem a -> ( a, FileSystem a, Maybe (Daemon a) ))
 
 
 type alias FlatSystem a u =

@@ -27,9 +27,16 @@ init =
 
         system =
             List.foldl f emptySystem files
-                |> (\x -> { x | daemons = [ catDaemon 99 "hello" ] })
+
+        daemons =
+            [ { daemon = catDaemon "hello", name = "kitty", lifetime = 100 } ]
     in
-        { history = [], buffer = "echo hello | write world", system = system }
+        { history = []
+        , buffer =
+            "spawn 9 dog ( echo hel ! append hello )"
+            --"echo hello | write world"
+        , system = { system | daemons = daemons }
+        }
 
 
 type alias Model =
@@ -141,7 +148,6 @@ view model =
                 :: model.history
                 |> List.reverse
                 |> List.map (printEntry "$ ")
-                |> Debug.log "entries"
                 |> String.join "\n"
 
         mainStyle =
