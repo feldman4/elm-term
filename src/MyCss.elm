@@ -39,7 +39,7 @@ terminalText =
 
 fullWindow : List Mixin
 fullWindow =
-    [ height (pct 100) ]
+    [ height (pct 100), overflow scroll ]
 
 
 css : Stylesheet

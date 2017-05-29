@@ -2,11 +2,11 @@ module Terminal exposing (..)
 
 import Html exposing (text, button, div, br)
 import MyCss exposing (..)
-import String.Extra
 import Keyboard exposing (KeyCode)
 import Char
-import FileSystem exposing (FlatSystem, addFile, unsafeAddFile, files, emptySystem)
-import Command exposing (execute)
+import FileSystem exposing (FileSystem, Daemon(..), addFile, unsafeAddFile, files, emptySystem)
+import Command exposing (execute, catDaemon, updateDaemons)
+import Time exposing (Time)
 
 
 main : Program Never Model Msg
@@ -27,14 +27,20 @@ init =
 
         system =
             List.foldl f emptySystem files
+                |> (\x -> { x | daemons = [ catDaemon 99 "hello" ] })
     in
-        { history = "write /hello", system = system }
+        { history = [], buffer = "echo hello | write world", system = system }
 
 
 type alias Model =
-    { history : String
-    , system : FlatSystem String
+    { history : List Entry
+    , system : FileSystem String
+    , buffer : String
     }
+
+
+type alias Entry =
+    { input : String, output : String }
 
 
 
@@ -44,16 +50,45 @@ type alias Model =
 type Msg
     = KeyPress KeyCode
     | KeyDown KeyCode
+    | Tick Time
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Tick time ->
+            let
+                ( streams, system_, daemons_ ) =
+                    updateDaemons 1 model.system model.system.daemons
+
+                output =
+                    streams
+                        |> List.filter ((/=) "")
+                        |> String.join "\n"
+
+                entry =
+                    { input = "daemons speak", output = output }
+
+                addHistory model =
+                    if output == "" then
+                        model
+                    else
+                        { model | history = entry :: model.history }
+            in
+                if List.isEmpty model.system.daemons then
+                    model ! []
+                else
+                    ({ model
+                        | system = system_
+                     }
+                        |> addHistory
+                    )
+                        ! []
+
         KeyPress key ->
-            model.history
-                |> updateHistory key
-                |> (\x -> { model | history = x })
-                |> (\x -> x ! [])
+            model.buffer
+                |> updateBuffer key
+                |> (\x -> { model | buffer = x } ! [])
 
         KeyDown key ->
             case key of
@@ -61,16 +96,13 @@ update msg model =
                     update (KeyPress key) model
 
                 13 ->
-                    model.history
-                        |> String.lines
-                        |> List.reverse
-                        |> List.head
-                        |> Maybe.withDefault model.history
+                    model.buffer
                         |> (\x -> execute x model.system)
-                        |> (\( txt, sys ) ->
+                        |> (\( stdout, sys ) ->
                                 { model
-                                    | history = model.history ++ "\n" ++ txt
+                                    | history = { input = model.buffer, output = stdout } :: model.history
                                     , system = sys
+                                    , buffer = ""
                                 }
                                     ! []
                            )
@@ -79,33 +111,38 @@ update msg model =
                     model ! []
 
 
-updateHistory : KeyCode -> String -> String
-updateHistory key history =
+updateBuffer : KeyCode -> String -> String
+updateBuffer key buffer =
     case key of
         13 ->
-            history ++ "\n"
+            buffer
 
         8 ->
-            if String.endsWith "\n" history then
-                history
-            else
-                String.dropRight 1 history
+            String.dropRight 1 buffer
 
         _ ->
-            key |> Char.fromCode |> String.fromChar |> (++) history
+            key |> Char.fromCode |> String.fromChar |> (++) buffer
 
 
 
 -- VIEW
 
 
+cursor : String
+cursor =
+    String.fromChar '█'
+
+
 view : Model -> Html.Html Msg
 view model =
     let
         history =
-            model.history
-                |> printHistory ">"
-                |> addCursor
+            { input = model.buffer ++ cursor, output = "" }
+                :: model.history
+                |> List.reverse
+                |> List.map (printEntry "$ ")
+                |> Debug.log "entries"
+                |> String.join "\n"
 
         mainStyle =
             backgroundStyle ++ terminalText ++ fullWindow
@@ -113,16 +150,12 @@ view model =
         div [ styles mainStyle ] [ breakText history ]
 
 
-printHistory : String -> String -> String
-printHistory prompt history =
-    history
-        |> String.Extra.replace "\n" ("\n" ++ prompt)
-        |> (++) prompt
-
-
-addCursor : String -> String
-addCursor string =
-    string ++ (String.fromChar '█')
+printEntry : String -> Entry -> String
+printEntry prompt { input, output } =
+    if output == "" then
+        prompt ++ input
+    else
+        [ prompt ++ input, output ] |> String.join "\n"
 
 
 breakText : String -> Html.Html msg
@@ -140,4 +173,8 @@ breakText string =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    [ Keyboard.downs KeyDown, Keyboard.presses KeyPress ] |> Sub.batch
+    [ Keyboard.downs KeyDown
+    , Keyboard.presses KeyPress
+    , Time.every Time.second Tick
+    ]
+        |> Sub.batch

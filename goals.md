@@ -13,7 +13,7 @@ time
 - ok: ls, cat, echo, pwd, cd, write
 - todo: grep, xargs?
 
-
+  
 ### execution
 easy:
 - fixed command list

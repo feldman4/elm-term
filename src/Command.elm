@@ -7,9 +7,115 @@ import Regex exposing (Regex)
 import Maybe.Extra
 
 
+{-| Mimics UNIX command line.
+-}
 main : Html.Html msg
 main =
     text ""
+
+
+
+-- TOP LEVEL
+
+
+{-|
+- split at |
+- simple matcher: String -> Maybe Command
+- register commands as simple matchers
+- including ls => a becomes String
+-}
+parse : String -> Maybe (IOCommand String)
+parse input =
+    let
+        commands =
+            [ matchCommandArity0 "^$" doNothing
+            , matchCommandArity0 "^ls$" lsCwd
+            , matchCommandArity0 "^l$" lsCwd
+            , matchCommandArity0 "^pwd$" pwd
+            , matchCommandArity0 "^cd\\s+\\.\\.$" cdUp
+            , matchCommandArity1 "echo\\s+(.*)" echo
+            , matchCommandArity1 "cat\\s+([\\w|\\.|/]+)" cat
+            , matchCommandArity1 "write\\s+([\\w|\\.|/]+)" write
+            , matchCommandArity1 "append\\s+([\\w|\\.|/]+)" append
+            , matchCommandArity1 "ls\\s+([\\w|\\.|/]+)" ls
+            , matchCommandArity1 "cd\\s+([\\w|\\.|/]+)" cd
+            , matchCommandArity0 "^daemons$" showDaemons
+            ]
+    in
+        input
+            |> String.split "|"
+            |> List.map String.trim
+            |> Maybe.Extra.traverse ((flip traverse2) commands)
+            |> Maybe.map (List.Extra.foldl1 join)
+            |> Maybe.withDefault Nothing
+
+
+execute : String -> FileSystem String -> ( String, FileSystem String )
+execute input system =
+    case parse input of
+        Just command ->
+            case command "" system of
+                Ok x ->
+                    x
+
+                Err s ->
+                    ( "Error: " ++ s, system )
+
+        Nothing ->
+            ( "Error: failed to parse " ++ input, system )
+
+
+
+-- DAEMONS
+
+
+type alias DaemonPipe a =
+    ( List a, FileSystem a, List (Daemon a) )
+
+
+updateDaemons : Int -> FileSystem a -> List (Daemon a) -> DaemonPipe a
+updateDaemons cycles system daemons =
+    let
+        ( streams, system_, daemons_ ) =
+            List.foldl (updateDaemon cycles) ( [], system, [] ) daemons
+    in
+        ( streams, { system_ | daemons = daemons_ }, [] )
+
+
+updateDaemon : Int -> Daemon a -> DaemonPipe a -> DaemonPipe a
+updateDaemon cycles (Daemon _ _ daemon) ( stream, system, daemons ) =
+    case daemon cycles system of
+        ( stream_, system_, Just daemon_ ) ->
+            ( stream_ :: stream, system_, daemon_ :: daemons )
+
+        ( stream_, system_, Nothing ) ->
+            ( stream_ :: stream, system_, daemons )
+
+
+{-| Creates its own replacement.
+TODO: eliminate double lifetime
+-}
+catDaemon : Int -> String -> Daemon String
+catDaemon cycles name =
+    if cycles <= 0 then
+        Daemon ("cat:" ++ name) 0 (\cycles_ system -> ( "", system, Nothing ))
+    else
+        let
+            innerDaemon elapsed system =
+                let
+                    ( stream_, system_ ) =
+                        (append name) "cat" system |> Result.withDefault ( "", system )
+
+                    daemonSpawn =
+                        catDaemon (cycles - elapsed) name
+                in
+                    ( stream_, system_, Just daemonSpawn )
+        in
+            Daemon ("cat:" ++ name) cycles innerDaemon
+
+
+
+-- TYPES
 
 
 type alias Stream =
@@ -20,12 +126,12 @@ type alias Error =
     String
 
 
-type alias PureCommand a =
-    a -> a
-
-
 type alias IOCommand a =
-    a -> FlatSystem a -> Result Error ( a, FlatSystem a )
+    a -> FileSystem a -> Result Error ( a, FileSystem a )
+
+
+
+-- COMMANDS
 
 
 {-| Outputs strings. Can be IOCommand a if a function to lift to Stream type
@@ -33,9 +139,14 @@ is provided.
 -}
 ls : Name -> IOCommand String
 ls name _ system =
-    getContents (makeAbsolute name system) 1 system
-        |> Result.map (String.join " ")
-        |> Result.map (\a -> ( a, system ))
+    let
+        name_ =
+            makeAbsolute (name ++ "/") system
+    in
+        getContents name_ 1 system
+            |> Result.map ((List.map (String.dropLeft 1)) >> String.join "\n")
+            |> Result.map (\a -> [ "---  " ++ name_ ++ "  ---", a ] |> String.join "\n")
+            |> Result.map (\a -> ( a, system ))
 
 
 lsCwd : IOCommand String
@@ -77,7 +188,7 @@ echo x _ system =
 -}
 cat : Name -> IOCommand a
 cat name _ system =
-    get (makeAbsolute name system) system
+    get name system
         |> Result.map (\a -> ( a, system ))
 
 
@@ -85,8 +196,31 @@ cat name _ system =
 -}
 write : Name -> IOCommand String
 write name stream system =
-    addFile (makeAbsolute name system) stream system
+    addFile name stream system
         |> Result.map (\x -> ( "", x ))
+
+
+append : Name -> IOCommand String
+append name stream system =
+    get name system
+        |> Result.map (\x -> ( "", unsafeAddFile name (x ++ stream) system ))
+
+
+showDaemons : IOCommand String
+showDaemons stream system =
+    let
+        format (Daemon name lifetime _) =
+            (toString lifetime) ++ " " ++ name
+    in
+        system.daemons
+            |> List.map format
+            |> String.join "\n"
+            |> (\x -> Result.Ok ( x, system ))
+
+
+doNothing : IOCommand String
+doNothing stream system =
+    Result.Ok ( stream, system )
 
 
 matchCommandArity0 : String -> IOCommand a -> String -> Maybe (IOCommand a)
@@ -114,32 +248,8 @@ matchCommandArity1 pattern command input =
             Nothing
 
 
-{-|
-- split at |
-- simple matcher: String -> Maybe Command
-- register commands as simple matchers
-- including ls => a becomes String
--}
-parse : String -> Maybe (IOCommand String)
-parse input =
-    let
-        commands =
-            [ matchCommandArity0 "^ls$" lsCwd
-            , matchCommandArity0 "^pwd$" pwd
-            , matchCommandArity0 "^cd\\s+\\.\\.$" cdUp
-            , matchCommandArity1 "echo\\s+(.*)" echo
-            , matchCommandArity1 "cat\\s+([\\w|\\.|/]+)" cat
-            , matchCommandArity1 "write\\s+([\\w|\\.|/]+)" write
-            , matchCommandArity1 "ls\\s+([\\w|\\.|/]+)" ls
-            , matchCommandArity1 "cd\\s+([\\w|\\.|/]+)" cd
-            ]
-    in
-        input
-            |> String.split "|"
-            |> List.map String.trim
-            |> Maybe.Extra.traverse ((flip traverse2) commands)
-            |> Maybe.map (List.Extra.foldl1 join)
-            |> Maybe.withDefault Nothing
+
+-- UTILITIES
 
 
 join : (a -> b -> Result c ( d, e )) -> (d -> e -> Result c value) -> a -> b -> Result c value
@@ -165,18 +275,3 @@ traverse2 a fs =
 
                 Nothing ->
                     traverse2 a rest
-
-
-execute : String -> FlatSystem String -> ( String, FlatSystem String )
-execute input system =
-    case parse input of
-        Just command ->
-            case command "stdin" system of
-                Ok x ->
-                    x
-
-                Err s ->
-                    ( "Error: " ++ s, system )
-
-        Nothing ->
-            ( "Error: failed to parse " ++ input, system )

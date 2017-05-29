@@ -19,6 +19,7 @@ files =
     [ "/usr/bin/"
     , "/usr/profile"
     , "/lib/so"
+    , "/hello"
     ]
 
 
@@ -53,7 +54,7 @@ isAbsolute =
     String.startsWith "/"
 
 
-makeAbsolute : String -> FlatSystem a -> String
+makeAbsolute : String -> CWD u -> String
 makeAbsolute path { cwd } =
     if isAbsolute path then
         path |> sanitize
@@ -103,16 +104,38 @@ for directories. Represent empty directories as Nothing. Only add a file if the
 parent directory exists. When removing a key, also remove all keys that begin
 with it.
 -}
-type alias FlatSystem a =
-    { storage : Dict Name (Maybe a), cwd : String }
+type alias FileSystem a =
+    FlatSystem a (Daemonic a)
 
 
-emptySystem : FlatSystem a
+type alias Daemonic a =
+    { daemons : List (Daemon a) }
+
+
+{-| bad, two sources of truth for lifetime.
+-}
+type Daemon a
+    = Daemon String Int (Int -> FileSystem a -> ( a, FileSystem a, Maybe (Daemon a) ))
+
+
+type alias FlatSystem a u =
+    Storage a (CWD u)
+
+
+type alias Storage a u =
+    { u | storage : Dict Name (Maybe a) }
+
+
+type alias CWD u =
+    { u | cwd : String }
+
+
+emptySystem : FileSystem a
 emptySystem =
-    { storage = Dict.empty, cwd = "/" }
+    { storage = Dict.empty, cwd = "/", daemons = [] }
 
 
-validate : FlatSystem a -> FlatSystem a
+validate : FlatSystem a u -> FlatSystem a u
 validate ({ storage, cwd } as system) =
     if cwd == "/" then
         system
@@ -122,7 +145,7 @@ validate ({ storage, cwd } as system) =
         system
 
 
-member : Name -> FlatSystem a -> Bool
+member : Name -> Storage a u -> Bool
 member name system =
     if name == "/" then
         True
@@ -130,7 +153,7 @@ member name system =
         Dict.member name system.storage
 
 
-safeInsert : Name -> Maybe a -> FlatSystem a -> Result Error (FlatSystem a)
+safeInsert : Name -> Maybe a -> Storage a u -> Result Error (Storage a u)
 safeInsert name x system =
     let
         nameExists =
@@ -152,7 +175,7 @@ safeInsert name x system =
 
 {-| Insert with parent directories, overriding existing.
 -}
-unsafeInsert : Name -> Maybe a -> FlatSystem a -> FlatSystem a
+unsafeInsert : Name -> Maybe a -> Storage a u -> Storage a u
 unsafeInsert name x system =
     system.storage
         |> Dict.insert name x
@@ -160,43 +183,46 @@ unsafeInsert name x system =
         |> (\x -> { system | storage = x })
 
 
-makeDir : Name -> FlatSystem a -> Result Error (FlatSystem a)
+makeDir : Name -> Storage a u -> Result Error (Storage a u)
 makeDir name =
     safeInsert name Nothing
 
 
-addFile : Name -> a -> FlatSystem a -> Result Error (FlatSystem a)
-addFile name x =
-    safeInsert name (Just x)
+addFile : Name -> a -> FlatSystem a u -> Result Error (FlatSystem a u)
+addFile name file system =
+    safeInsert (makeAbsolute name system) (Just file) system
 
 
-unsafeAddFile : Name -> a -> FlatSystem a -> FlatSystem a
-unsafeAddFile name x =
-    unsafeInsert name (Just x)
+unsafeAddFile : Name -> a -> FlatSystem a u -> FlatSystem a u
+unsafeAddFile name file system =
+    unsafeInsert (makeAbsolute name system) (Just file) system
 
 
-getContents : Name -> Int -> FlatSystem a -> Result Error (List Name)
+getContents : Name -> Int -> FlatSystem a u -> Result Error (List Name)
 getContents name depth system =
     let
+        name_ =
+            makeAbsolute name system
+
         test x =
             getParents x
                 |> List.take depth
-                |> List.member name
+                |> List.member name_
     in
-        if member name system then
+        if member name_ system then
             system.storage
                 |> Dict.keys
-                |> List.filter (String.contains name)
+                |> List.filter (String.contains name_)
                 |> List.filter test
-                |> List.filter ((/=) name)
+                |> List.filter ((/=) name_)
                 |> Result.Ok
         else
-            Result.Err "No such file or directory"
+            Result.Err "No such directory"
 
 
-get : Name -> FlatSystem a -> Result Error a
+get : Name -> FlatSystem a u -> Result Error a
 get name system =
-    case Dict.get name system.storage of
+    case Dict.get (makeAbsolute name system) system.storage of
         Just (Just x) ->
             Result.Ok x
 
@@ -207,41 +233,43 @@ get name system =
             Result.Err "Is a directory"
 
 
-type alias System =
-    Dict Name Item
 
-
-type Item
-    = Folder System
-    | File Content
-
-
-addFile2 : Content -> String -> System -> System
-addFile2 content path system =
-    if (isAbsolute path) && (isFile path) then
-        addItem2 (File content) (String.split "/" path) system
-    else
-        system
-
-
-addItem2 : Item -> List Name -> System -> System
-addItem2 item path system =
-    case path of
-        [] ->
-            system
-
-        name :: [] ->
-            Dict.insert name item system
-
-        folderName :: rest ->
-            -- if there's a folder, update it with this method
-            case Dict.get folderName system of
-                Just (Folder subSystem) ->
-                    Dict.insert folderName (Folder <| addItem2 item rest subSystem) system
-
-                Just (File _) ->
-                    -- error
-                    system
-
-                Nothing ->
-                    Dict.insert folderName (Folder <| addItem2 item rest Dict.empty) system
+--
+-- type alias System =
+--     Dict Name Item
+--
+--
+-- type Item
+--     = Folder System
+--     | File Content
+--
+--
+-- addFile2 : Content -> String -> System -> System
+-- addFile2 content path system =
+--     if (isAbsolute path) && (isFile path) then
+--         addItem2 (File content) (String.split "/" path) system
+--     else
+--         system
+--
+--
+-- addItem2 : Item -> List Name -> System -> System
+-- addItem2 item path system =
+--     case path of
+--         [] ->
+--             system
+--
+--         name :: [] ->
+--             Dict.insert name item system
+--
+--         folderName :: rest ->
+--             -- if there's a folder, update it with this method
+--             case Dict.get folderName system of
+--                 Just (Folder subSystem) ->
+--                     Dict.insert folderName (Folder <| addItem2 item rest subSystem) system
+--
+--                 Just (File _) ->
+--                     -- error
+--                     system
+--
+--                 Nothing ->
+--                     Dict.insert folderName (Folder <| addItem2 item rest Dict.empty) system
