@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html><head><meta charset="UTF-8"><title>Terminal</title><style>html,head,body { padding:0; margin:0; }
+<html><head><meta charset="UTF-8"><title>App</title><style>html,head,body { padding:0; margin:0; }
 body { font-family: calibri, helvetica, arial, sans-serif; }</style><script type="text/javascript">
 (function() {
 'use strict';
@@ -22155,10 +22155,181 @@ var _user$project$Terminal$main = _elm_lang$html$Html$program(
 		view: _user$project$Terminal$view(_user$project$Terminal$config),
 		subscriptions: _user$project$Terminal$subscriptions
 	})();
+var _user$project$App$mapEntry = F2(
+	function (f, entry) {
+		var _p0 = entry;
+		if (_p0.ctor === 'Input') {
+			return _user$project$Terminal$Input(
+				f(_p0._0));
+		} else {
+			return _user$project$Terminal$Output(
+				f(_p0._0));
+		}
+	});
+var _user$project$App$config = _user$project$Command$fileConfig;
+var _user$project$App$executeBuffer = function (model) {
+	var _p1 = A3(_user$project$Command$execute, _user$project$App$config, model.buffer, model.system);
+	var stdout = _p1._0;
+	var system = _p1._1;
+	var history = {
+		ctor: '::',
+		_0: _user$project$Terminal$Output(stdout),
+		_1: {
+			ctor: '::',
+			_0: _user$project$Terminal$Input(
+				_user$project$App$config.fromString(model.buffer)),
+			_1: model.history
+		}
+	};
+	return _elm_lang$core$Native_Utils.update(
+		model,
+		{history: history, system: system, buffer: ''});
+};
+var _user$project$App$update = F2(
+	function (msg, model) {
+		var _p2 = msg;
+		switch (_p2.ctor) {
+			case 'Tick':
+				var _p3 = A3(_user$project$Command$updateDaemons, 1, model.system, model.system.daemons);
+				var streams = _p3._0;
+				var system = _p3._1;
+				var history = A2(
+					_elm_lang$core$Basics_ops['++'],
+					A2(_user$project$Terminal$printDaemonOutput, _user$project$App$config, streams),
+					model.history);
+				return _elm_lang$core$Native_Utils.update(
+					model,
+					{system: system, history: history});
+			case 'KeyPress':
+				return _elm_lang$core$Native_Utils.update(
+					model,
+					{
+						buffer: A2(_user$project$Terminal$updateBuffer, _p2._0, model.buffer)
+					});
+			case 'KeyDown':
+				return _elm_lang$core$Native_Utils.update(
+					model,
+					{
+						buffer: A3(
+							_user$project$Terminal$updateBufferDown,
+							_p2._0,
+							model.buffer,
+							A2(
+								_elm_lang$core$List$map,
+								_user$project$App$mapEntry(_user$project$App$config.toString),
+								model.history))
+					});
+			default:
+				return _user$project$App$executeBuffer(
+					_elm_lang$core$Native_Utils.update(
+						model,
+						{buffer: _p2._0}));
+		}
+	});
+var _user$project$App$Execute = function (a) {
+	return {ctor: 'Execute', _0: a};
+};
+var _user$project$App$init = function () {
+	var buffer = 'echo cat | compile exe | write say | run hello';
+	var prehistory = {
+		ctor: '::',
+		_0: 'echo \"echo lo ! append hello ! echo\" | spawn 99 kitty | echo',
+		_1: {
+			ctor: '::',
+			_0: 'daemons',
+			_1: {
+				ctor: '::',
+				_0: 'ls',
+				_1: {ctor: '[]'}
+			}
+		}
+	};
+	var daemons = {ctor: '[]'};
+	var f = function (name) {
+		return A2(
+			_user$project$FileSystem$unsafeAddFile,
+			name,
+			_user$project$Command$Stream(
+				_elm_lang$core$String$toUpper(name)));
+	};
+	var system = A3(_elm_lang$core$List$foldl, f, _user$project$FileSystem$emptySystem, _user$project$FileSystem$files);
+	return function (m) {
+		return _elm_lang$core$Native_Utils.update(
+			m,
+			{buffer: buffer});
+	}(
+		function (m) {
+			return A3(
+				_elm_lang$core$List$foldl,
+				_user$project$App$update,
+				m,
+				A2(_elm_lang$core$List$map, _user$project$App$Execute, prehistory));
+		}(
+			{
+				history: {ctor: '[]'},
+				buffer: '',
+				system: system
+			}));
+}();
+var _user$project$App$Tick = function (a) {
+	return {ctor: 'Tick', _0: a};
+};
+var _user$project$App$KeyDown = function (a) {
+	return {ctor: 'KeyDown', _0: a};
+};
+var _user$project$App$KeyPress = function (a) {
+	return {ctor: 'KeyPress', _0: a};
+};
+var _user$project$App$downSub = F2(
+	function (_p4, key) {
+		var _p5 = _p4;
+		var _p6 = key;
+		switch (_p6) {
+			case 8:
+				return _user$project$App$KeyPress(8);
+			case 13:
+				return _user$project$App$Execute(_p5.buffer);
+			default:
+				return _user$project$App$KeyDown(_p6);
+		}
+	});
+var _user$project$App$subscriptions = function (model) {
+	return _elm_lang$core$Platform_Sub$batch(
+		{
+			ctor: '::',
+			_0: _elm_lang$keyboard$Keyboard$downs(
+				_user$project$App$downSub(model)),
+			_1: {
+				ctor: '::',
+				_0: _elm_lang$keyboard$Keyboard$presses(_user$project$App$KeyPress),
+				_1: {
+					ctor: '::',
+					_0: A2(_elm_lang$core$Time$every, _elm_lang$core$Time$second, _user$project$App$Tick),
+					_1: {ctor: '[]'}
+				}
+			}
+		});
+};
+var _user$project$App$main = _elm_lang$html$Html$program(
+	{
+		init: A2(
+			_elm_lang$core$Platform_Cmd_ops['!'],
+			_user$project$App$init,
+			{ctor: '[]'}),
+		update: F2(
+			function (a, b) {
+				return A2(
+					_elm_lang$core$Platform_Cmd_ops['!'],
+					A2(_user$project$App$update, a, b),
+					{ctor: '[]'});
+			}),
+		view: _user$project$Terminal$view(_user$project$App$config),
+		subscriptions: _user$project$App$subscriptions
+	})();
 var Elm = {};
-Elm['Terminal'] = Elm['Terminal'] || {};
-if (typeof _user$project$Terminal$main !== 'undefined') {
-    _user$project$Terminal$main(Elm['Terminal'], 'Terminal', {"types":{"unions":{"Terminal.Msg":{"args":[],"tags":{"Tick":["Time.Time"],"KeyDown":["Keyboard.KeyCode"],"KeyPress":["Keyboard.KeyCode"]}}},"aliases":{"Keyboard.KeyCode":{"args":[],"type":"Int"},"Time.Time":{"args":[],"type":"Float"}},"message":"Terminal.Msg"},"versions":{"elm":"0.18.0"}});
+Elm['App'] = Elm['App'] || {};
+if (typeof _user$project$App$main !== 'undefined') {
+    _user$project$App$main(Elm['App'], 'App', {"types":{"unions":{"App.Msg":{"args":[],"tags":{"Execute":["String"],"Tick":["Time.Time"],"KeyDown":["Keyboard.KeyCode"],"KeyPress":["Keyboard.KeyCode"]}}},"aliases":{"Keyboard.KeyCode":{"args":[],"type":"Int"},"Time.Time":{"args":[],"type":"Float"}},"message":"App.Msg"},"versions":{"elm":"0.18.0"}});
 }
 
 if (typeof define === "function" && define['amd'])
@@ -22190,4 +22361,4 @@ for (var publicModule in Elm)
 }
 
 }).call(this);
-</script></head><body><script type="text/javascript">Elm.Terminal.fullscreen()</script></body></html>
+</script></head><body><script type="text/javascript">Elm.App.fullscreen()</script></body></html>
