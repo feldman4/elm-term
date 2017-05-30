@@ -6,6 +6,7 @@ import List.Extra
 import Maybe.Extra
 import Regex exposing (Regex)
 import String.Extra
+import Result.Extra
 
 
 {-| Mimics UNIX command line.
@@ -62,7 +63,7 @@ fileConfig =
         compile name system input =
             case input of
                 Executable _ command ->
-                    Result.Ok (Executable name command)
+                    Ok (Executable name command)
 
                 Stream expr ->
                     expr
@@ -84,6 +85,8 @@ fileConfig =
                     Executable (b ++ "(" ++ a ++ ")") (join (echo fileConfig a) g)
 
                 ( Executable a f, Stream b ) ->
+                    -- could run the executable for its effect on filesystem, then
+                    -- discard result
                     Stream b
     in
         { null = Stream ""
@@ -138,12 +141,14 @@ parseCommands config _ input =
               -- manipulate files
             , matchCommandArity1 "^echo\\s+\\\"(.*)\\\"$" (echo config)
             , matchCommandArity1 "^echo\\s+(.*)$" (echo config)
+            , matchCommandArity0 "^cat$" catStdin
             , matchCommandArity1 "^cat\\s+([\\w|\\.|/]+)$" cat
-            , matchCommandArity1 "^write\\s+([\\w|\\.\\*|/]+)$" (write config)
+            , matchCommandArity1 "^write\\s+([\\w|\\.\\*|/]+)$" write
             , matchCommandArity1 "^append\\s+([\\w|\\.|/]+)$" (append config)
             , matchCommandArity1 "^rm\\s+([\\w|\\.|/]+)$" (rm config)
               -- compile
             , matchCommandArity1 "^compile\\s+(\\w+)$" (compile config)
+            , matchCommandArity1 "^run\\s+(\\w+)$" (run config)
               -- daemons
             , matchCommandArity0 "^daemons$" (showDaemons config)
             , matchCommandArity1 "^kill\\s+([\\w|\\.|/]+)$" (kill config)
@@ -345,9 +350,9 @@ cd name stream system =
             { system | cwd = name_ } |> validate
     in
         if member name_ system then
-            Result.Ok ( stream, system_ )
+            Ok ( stream, system_ )
         else
-            Result.Err (name ++ ": No such directory")
+            Err (name ++ ": No such directory")
 
 
 cdUp : IOCommand a
@@ -357,17 +362,17 @@ cdUp stream system =
 
 pwd : Config a -> IOCommand a
 pwd { fromString } _ system =
-    Result.Ok ( fromString system.cwd, system )
+    Ok ( fromString system.cwd, system )
 
 
 echo : Config a -> String -> IOCommand a
 echo { fromString } x _ system =
-    Result.Ok ( fromString x, system )
+    Ok ( fromString x, system )
 
 
 man : Config a -> IOCommand a
 man { fromString } _ system =
-    Result.Ok ( fromString manString, system )
+    Ok ( fromString manString, system )
 
 
 {-| Ignores stdin.
@@ -378,20 +383,28 @@ cat name _ system =
         |> Result.map (\a -> ( a, system ))
 
 
+{-| Mimics UNIX making this the identity command, could treat stdin as a file
+instead.
+-}
+catStdin : IOCommand a
+catStdin stream system =
+    Ok ( stream, system )
+
+
 {-| Can be IOCommand a if a null stream is provided.
 Inside a pipeline, nice if write and append echo to stdout. At the end of a
 pipeline, not so nice. Could make writeAndContinue with a tee operator.
 -}
-write : Config a -> Name -> IOCommand a
-write { null } name stream system =
+write : Name -> IOCommand a
+write name stream system =
     addFile name stream system
-        |> Result.map (\x -> ( null, x ))
+        |> Result.map (\x -> ( stream, x ))
 
 
 append : Config a -> Name -> IOCommand a
-append { null, append } name stream system =
+append { append } name stream system =
     get name system
-        |> Result.map (\x -> ( null, unsafeAddFile name (append x stream) system ))
+        |> Result.map (\x -> ( stream, unsafeAddFile name (append x stream) system ))
 
 
 rm : Config a -> Name -> IOCommand a
@@ -413,6 +426,14 @@ compile config name stream system =
         |> Result.map (\a -> ( a, system ))
 
 
+run : Config a -> String -> IOCommand a
+run config file stream system =
+    config.toCommand stream
+        |> Result.fromMaybe ("not a valid command " ++ (config.toString stream))
+        |> Result.map2 (\a cmd -> cmd a system) (get file system)
+        |> Result.Extra.extract Err
+
+
 kill : Config a -> String -> IOCommand a
 kill { fromString } daemonName stream system =
     let
@@ -424,9 +445,9 @@ kill { fromString } daemonName stream system =
                 system_ =
                     { system | daemons = List.filter (not << target) system.daemons }
             in
-                Result.Ok ( "killed " ++ daemonName |> fromString, system_ )
+                Ok ( "killed " ++ daemonName |> fromString, system_ )
         else
-            Result.Err ("no daemons around named " ++ daemonName)
+            Err ("no daemons around named " ++ daemonName)
 
 
 {-| Parse parenthesized input, handling errors etc.
@@ -453,7 +474,7 @@ spawn config lifetime daemonName stream system =
             }
 
         registerDaemon daemon =
-            Result.Ok ( stream, { system | daemons = daemon :: system.daemons } )
+            Ok ( stream, { system | daemons = daemon :: system.daemons } )
     in
         String.toInt lifetime
             |> Result.mapError (\_ -> lifetime ++ " is not an integer")
@@ -482,12 +503,12 @@ showDaemons { fromString } stream system =
             |> List.map format
             |> String.join "\n"
             |> (++) header
-            |> (\x -> Result.Ok ( fromString x, system ))
+            |> (\x -> Ok ( fromString x, system ))
 
 
 doNothing : IOCommand a
 doNothing stream system =
-    Result.Ok ( stream, system )
+    Ok ( stream, system )
 
 
 matchCommandArity0 : String -> IOCommand a -> String -> Maybe (IOCommand a)

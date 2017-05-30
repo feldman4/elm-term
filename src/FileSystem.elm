@@ -167,13 +167,13 @@ safeInsert name x system =
     in
         case ( parentExists, nameExists ) of
             ( True, False ) ->
-                Result.Ok { system | storage = Dict.insert name x system.storage }
+                Ok { system | storage = Dict.insert name x system.storage }
 
             ( False, _ ) ->
-                Result.Err ((getParent name) ++ " : No such directory")
+                Err ((getParent name) ++ " : No such directory")
 
             ( True, True ) ->
-                Result.Err (name ++ " : File exists")
+                Err (name ++ " : File exists")
 
 
 {-| Insert with parent directories, overriding existing.
@@ -218,22 +218,22 @@ getContents name depth system =
                 |> List.filter (String.contains name_)
                 |> List.filter test
                 |> List.filter ((/=) name_)
-                |> Result.Ok
+                |> Ok
         else
-            Result.Err "No such directory"
+            Err "No such directory"
 
 
 get : Name -> FlatSystem a u -> Result Error a
 get name system =
-    case Dict.get (makeAbsolute name system) system.storage of
+    case Dict.get (makeAbsolute name system |> Debug.log "get") system.storage of
         Just (Just x) ->
-            Result.Ok x
+            Ok x
 
         Nothing ->
-            Result.Err "No such file"
+            Err ("No such file " ++ name)
 
         Just Nothing ->
-            Result.Err "Is a directory"
+            Err "Is a directory"
 
 
 remove : Name -> FlatSystem a u -> FlatSystem a u
