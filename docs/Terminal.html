@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html><head><meta charset="UTF-8"><title>Terminal</title><style>html,head,body { padding:0; margin:0; }
+<html><head><meta charset="UTF-8"><title>App</title><style>html,head,body { padding:0; margin:0; }
 body { font-family: calibri, helvetica, arial, sans-serif; }</style><script type="text/javascript">
 (function() {
 'use strict';
@@ -20642,9 +20642,33 @@ var _user$project$FileSystem$get = F2(
 			}
 		}
 	});
+var _user$project$FileSystem$remove = F2(
+	function (name, system) {
+		var name_ = A2(_user$project$FileSystem$makeAbsolute, name, system);
+		var keep = F2(
+			function (s, _p12) {
+				return !A2(
+					_elm_lang$core$List$any,
+					F2(
+						function (x, y) {
+							return _elm_lang$core$Native_Utils.eq(x, y);
+						})(name_),
+					{
+						ctor: '::',
+						_0: s,
+						_1: _user$project$FileSystem$getParents(s)
+					});
+			});
+		return function (x) {
+			return _elm_lang$core$Native_Utils.update(
+				system,
+				{storage: x});
+		}(
+			A2(_elm_lang$core$Dict$filter, keep, system.storage));
+	});
 var _user$project$FileSystem$isFolder = _elm_lang$core$String$endsWith('/');
-var _user$project$FileSystem$isFile = function (_p12) {
-	return !_user$project$FileSystem$isFolder(_p12);
+var _user$project$FileSystem$isFile = function (_p13) {
+	return !_user$project$FileSystem$isFolder(_p13);
 };
 var _user$project$FileSystem$files = {
 	ctor: '::',
@@ -20728,7 +20752,7 @@ var _user$project$Command$matchCommandArity3 = F3(
 			return _elm_lang$core$Maybe$Nothing;
 		}
 	});
-var _user$project$Command$matchCommandArity1 = F3(
+var _user$project$Command$matchCommandArity2 = F3(
 	function (pattern, command, input) {
 		var _p5 = A3(
 			_elm_lang$core$Regex$find,
@@ -20737,9 +20761,28 @@ var _user$project$Command$matchCommandArity1 = F3(
 			input);
 		if (_p5.ctor === '::') {
 			var _p6 = _p5._0.submatches;
-			if (((_p6.ctor === '::') && (_p6._0.ctor === 'Just')) && (_p6._1.ctor === '[]')) {
+			if (((((_p6.ctor === '::') && (_p6._0.ctor === 'Just')) && (_p6._1.ctor === '::')) && (_p6._1._0.ctor === 'Just')) && (_p6._1._1.ctor === '[]')) {
 				return _elm_lang$core$Maybe$Just(
-					command(_p6._0._0));
+					A2(command, _p6._0._0, _p6._1._0._0));
+			} else {
+				return _elm_lang$core$Maybe$Nothing;
+			}
+		} else {
+			return _elm_lang$core$Maybe$Nothing;
+		}
+	});
+var _user$project$Command$matchCommandArity1 = F3(
+	function (pattern, command, input) {
+		var _p7 = A3(
+			_elm_lang$core$Regex$find,
+			_elm_lang$core$Regex$AtMost(1),
+			_elm_lang$core$Regex$regex(pattern),
+			input);
+		if (_p7.ctor === '::') {
+			var _p8 = _p7._0.submatches;
+			if (((_p8.ctor === '::') && (_p8._0.ctor === 'Just')) && (_p8._1.ctor === '[]')) {
+				return _elm_lang$core$Maybe$Just(
+					command(_p8._0._0));
 			} else {
 				return _elm_lang$core$Maybe$Nothing;
 			}
@@ -20749,12 +20792,12 @@ var _user$project$Command$matchCommandArity1 = F3(
 	});
 var _user$project$Command$matchCommandArity0 = F3(
 	function (pattern, command, input) {
-		var _p7 = A3(
+		var _p9 = A3(
 			_elm_lang$core$Regex$find,
 			_elm_lang$core$Regex$AtMost(1),
 			_elm_lang$core$Regex$regex(pattern),
 			input);
-		if (_p7.ctor === '::') {
+		if (_p9.ctor === '::') {
 			return _elm_lang$core$Maybe$Just(command);
 		} else {
 			return _elm_lang$core$Maybe$Nothing;
@@ -20765,23 +20808,24 @@ var _user$project$Command$doNothing = F2(
 		return _elm_lang$core$Result$Ok(
 			{ctor: '_Tuple2', _0: stream, _1: system});
 	});
-var _user$project$Command$showDaemons = F2(
-	function (stream, system) {
+var _user$project$Command$showDaemons = F3(
+	function (_p10, stream, system) {
+		var _p11 = _p10;
 		var plural = function (n) {
 			return _elm_lang$core$Native_Utils.eq(n, 1) ? '' : 's';
 		};
-		var header = function (_p8) {
-			var _p9 = _p8;
+		var header = function (_p12) {
+			var _p13 = _p12;
 			return A2(
 				_elm_lang$core$Basics_ops['++'],
 				'---  ',
 				A2(
 					_elm_lang$core$Basics_ops['++'],
-					_p9._0,
+					_p13._0,
 					A2(
 						_elm_lang$core$Basics_ops['++'],
 						' active daemon',
-						A2(_elm_lang$core$Basics_ops['++'], _p9._1, '  ---\n'))));
+						A2(_elm_lang$core$Basics_ops['++'], _p13._1, '  ---\n'))));
 		}(
 			function (n) {
 				return {
@@ -20791,16 +20835,20 @@ var _user$project$Command$showDaemons = F2(
 				};
 			}(
 				_elm_lang$core$List$length(system.daemons)));
-		var format = function (_p10) {
-			var _p11 = _p10;
+		var format = function (_p14) {
+			var _p15 = _p14;
 			return A2(
 				_elm_lang$core$Basics_ops['++'],
-				_elm_lang$core$Basics$toString(_p11.lifetime),
-				A2(_elm_lang$core$Basics_ops['++'], ' ', _p11.name));
+				_elm_lang$core$Basics$toString(_p15.lifetime),
+				A2(_elm_lang$core$Basics_ops['++'], ' ', _p15.name));
 		};
 		return function (x) {
 			return _elm_lang$core$Result$Ok(
-				{ctor: '_Tuple2', _0: x, _1: system});
+				{
+					ctor: '_Tuple2',
+					_0: _p11.fromString(x),
+					_1: system
+				});
 		}(
 			A2(
 				F2(
@@ -20813,11 +20861,12 @@ var _user$project$Command$showDaemons = F2(
 					'\n',
 					A2(_elm_lang$core$List$map, format, system.daemons))));
 	});
-var _user$project$Command$kill = F3(
-	function (daemonName, stream, system) {
-		var target = function (_p12) {
-			var _p13 = _p12;
-			return _elm_lang$core$Native_Utils.eq(_p13.name, daemonName);
+var _user$project$Command$kill = F4(
+	function (_p16, daemonName, stream, system) {
+		var _p17 = _p16;
+		var target = function (_p18) {
+			var _p19 = _p18;
+			return _elm_lang$core$Native_Utils.eq(_p19.name, daemonName);
 		};
 		if (A2(_elm_lang$core$List$any, target, system.daemons)) {
 			var system_ = _elm_lang$core$Native_Utils.update(
@@ -20825,15 +20874,16 @@ var _user$project$Command$kill = F3(
 				{
 					daemons: A2(
 						_elm_lang$core$List$filter,
-						function (_p14) {
-							return !target(_p14);
+						function (_p20) {
+							return !target(_p20);
 						},
 						system.daemons)
 				});
 			return _elm_lang$core$Result$Ok(
 				{
 					ctor: '_Tuple2',
-					_0: A2(_elm_lang$core$Basics_ops['++'], 'killed ', daemonName),
+					_0: _p17.fromString(
+						A2(_elm_lang$core$Basics_ops['++'], 'killed ', daemonName)),
 					_1: system_
 				});
 		} else {
@@ -20841,34 +20891,77 @@ var _user$project$Command$kill = F3(
 				A2(_elm_lang$core$Basics_ops['++'], 'no daemons around named ', daemonName));
 		}
 	});
-var _user$project$Command$append = F3(
-	function (name, stream, system) {
+var _user$project$Command$compile = F4(
+	function (config, name, stream, system) {
+		return A2(
+			_elm_lang$core$Result$map,
+			function (a) {
+				return {ctor: '_Tuple2', _0: a, _1: system};
+			},
+			A3(config.compile, name, system, stream));
+	});
+var _user$project$Command$rm = F4(
+	function (_p21, name, stream, system) {
+		var _p22 = _p21;
+		var _p23 = _p22.$null;
+		return A2(
+			_user$project$FileSystem$member,
+			A2(_user$project$FileSystem$makeAbsolute, name, system),
+			system) ? _elm_lang$core$Result$Ok(
+			{
+				ctor: '_Tuple2',
+				_0: _p23,
+				_1: A2(_user$project$FileSystem$remove, name, system)
+			}) : (A2(
+			_user$project$FileSystem$member,
+			A2(
+				_user$project$FileSystem$makeAbsolute,
+				A2(_elm_lang$core$Basics_ops['++'], name, '/'),
+				system),
+			system) ? _elm_lang$core$Result$Ok(
+			{
+				ctor: '_Tuple2',
+				_0: _p23,
+				_1: A2(
+					_user$project$FileSystem$remove,
+					A2(
+						_user$project$FileSystem$makeAbsolute,
+						A2(_elm_lang$core$Basics_ops['++'], name, '/'),
+						system),
+					system)
+			}) : _elm_lang$core$Result$Err(
+			A2(_elm_lang$core$Basics_ops['++'], 'no such file or directory ', name)));
+	});
+var _user$project$Command$append = F4(
+	function (_p24, name, stream, system) {
+		var _p25 = _p24;
 		return A2(
 			_elm_lang$core$Result$map,
 			function (x) {
 				return {
 					ctor: '_Tuple2',
-					_0: '',
+					_0: _p25.$null,
 					_1: A3(
 						_user$project$FileSystem$unsafeAddFile,
 						name,
-						A2(_elm_lang$core$Basics_ops['++'], x, stream),
+						A2(_p25.append, x, stream),
 						system)
 				};
 			},
 			A2(_user$project$FileSystem$get, name, system));
 	});
-var _user$project$Command$write = F3(
-	function (name, stream, system) {
+var _user$project$Command$write = F4(
+	function (_p26, name, stream, system) {
+		var _p27 = _p26;
 		return A2(
 			_elm_lang$core$Result$map,
 			function (x) {
-				return {ctor: '_Tuple2', _0: '', _1: x};
+				return {ctor: '_Tuple2', _0: _p27.$null, _1: x};
 			},
 			A3(_user$project$FileSystem$addFile, name, stream, system));
 	});
 var _user$project$Command$cat = F3(
-	function (name, _p15, system) {
+	function (name, _p28, system) {
 		return A2(
 			_elm_lang$core$Result$map,
 			function (a) {
@@ -20876,15 +20969,25 @@ var _user$project$Command$cat = F3(
 			},
 			A2(_user$project$FileSystem$get, name, system));
 	});
-var _user$project$Command$echo = F3(
-	function (x, _p16, system) {
+var _user$project$Command$echo = F4(
+	function (_p30, x, _p29, system) {
+		var _p31 = _p30;
 		return _elm_lang$core$Result$Ok(
-			{ctor: '_Tuple2', _0: x, _1: system});
+			{
+				ctor: '_Tuple2',
+				_0: _p31.fromString(x),
+				_1: system
+			});
 	});
-var _user$project$Command$pwd = F2(
-	function (_p17, system) {
+var _user$project$Command$pwd = F3(
+	function (_p33, _p32, system) {
+		var _p34 = _p33;
 		return _elm_lang$core$Result$Ok(
-			{ctor: '_Tuple2', _0: system.cwd, _1: system});
+			{
+				ctor: '_Tuple2',
+				_0: _p34.fromString(system.cwd),
+				_1: system
+			});
 	});
 var _user$project$Command$cd = F3(
 	function (name, stream, system) {
@@ -20911,8 +21014,9 @@ var _user$project$Command$cdUp = F2(
 			stream,
 			system);
 	});
-var _user$project$Command$ls = F3(
-	function (name, _p18, system) {
+var _user$project$Command$ls = F4(
+	function (_p36, name, _p35, system) {
+		var _p37 = _p36;
 		var name_ = A2(
 			_user$project$FileSystem$makeAbsolute,
 			A2(_elm_lang$core$Basics_ops['++'], name, '/'),
@@ -20920,7 +21024,11 @@ var _user$project$Command$ls = F3(
 		return A2(
 			_elm_lang$core$Result$map,
 			function (a) {
-				return {ctor: '_Tuple2', _0: a, _1: system};
+				return {
+					ctor: '_Tuple2',
+					_0: _p37.fromString(a),
+					_1: system
+				};
 			},
 			A2(
 				_elm_lang$core$Result$map,
@@ -20943,31 +21051,31 @@ var _user$project$Command$ls = F3(
 				},
 				A2(
 					_elm_lang$core$Result$map,
-					function (_p19) {
+					function (_p38) {
 						return A2(
 							_elm_lang$core$String$join,
 							'\n',
 							A2(
 								_elm_lang$core$List$map,
 								_elm_lang$core$String$dropLeft(1),
-								_p19));
+								_p38));
 					},
 					A3(_user$project$FileSystem$getContents, name_, 1, system))));
 	});
-var _user$project$Command$lsCwd = F2(
-	function (stream, system) {
-		return A3(_user$project$Command$ls, system.cwd, stream, system);
+var _user$project$Command$lsCwd = F3(
+	function (config, stream, system) {
+		return A4(_user$project$Command$ls, config, system.cwd, stream, system);
 	});
-var _user$project$Command$catDaemon = F2(
-	function (name, content) {
+var _user$project$Command$catDaemon = F3(
+	function (config, name, content) {
 		var innerDaemon = function (system) {
-			var daemonSpawn = A2(_user$project$Command$catDaemon, name, content);
-			var _p20 = A2(
+			var daemonSpawn = A3(_user$project$Command$catDaemon, config, name, content);
+			var _p39 = A2(
 				_elm_lang$core$Result$withDefault,
-				{ctor: '_Tuple2', _0: '', _1: system},
-				A3(_user$project$Command$append, name, content, system));
-			var stream_ = _p20._0;
-			var system_ = _p20._1;
+				{ctor: '_Tuple2', _0: config.$null, _1: system},
+				A4(_user$project$Command$append, config, name, content, system));
+			var stream_ = _p39._0;
+			var system_ = _p39._1;
 			return {
 				ctor: '_Tuple3',
 				_0: stream_,
@@ -20978,45 +21086,45 @@ var _user$project$Command$catDaemon = F2(
 		return _user$project$FileSystem$Daemon(innerDaemon);
 	});
 var _user$project$Command$updateDaemon = F3(
-	function (cycles, meta, _p21) {
-		var _p22 = _p21;
-		var _p28 = _p22._1;
-		var _p27 = _p22._0;
-		var _p26 = _p22._2;
+	function (cycles, meta, _p40) {
+		var _p41 = _p40;
+		var _p47 = _p41._1;
+		var _p46 = _p41._0;
+		var _p45 = _p41._2;
 		if (_elm_lang$core$Native_Utils.eq(meta.lifetime, 0)) {
-			return {ctor: '_Tuple3', _0: _p27, _1: _p28, _2: _p26};
+			return {ctor: '_Tuple3', _0: _p46, _1: _p47, _2: _p45};
 		} else {
-			var unpack = function (_p23) {
-				var _p24 = _p23;
-				return _p24._0;
+			var unpack = function (_p42) {
+				var _p43 = _p42;
+				return _p43._0;
 			};
-			var _p25 = A2(unpack, meta.daemon, _p28);
-			if (_p25._2.ctor === 'Just') {
+			var _p44 = A2(unpack, meta.daemon, _p47);
+			if (_p44._2.ctor === 'Just') {
 				return {
 					ctor: '_Tuple3',
-					_0: {ctor: '::', _0: _p25._0, _1: _p27},
-					_1: _p25._1,
+					_0: {ctor: '::', _0: _p44._0, _1: _p46},
+					_1: _p44._1,
 					_2: {
 						ctor: '::',
 						_0: _elm_lang$core$Native_Utils.update(
 							meta,
-							{daemon: _p25._2._0, lifetime: meta.lifetime - cycles}),
-						_1: _p26
+							{daemon: _p44._2._0, lifetime: meta.lifetime - cycles}),
+						_1: _p45
 					}
 				};
 			} else {
 				return {
 					ctor: '_Tuple3',
-					_0: {ctor: '::', _0: _p25._0, _1: _p27},
-					_1: _p25._1,
-					_2: _p26
+					_0: {ctor: '::', _0: _p44._0, _1: _p46},
+					_1: _p44._1,
+					_2: _p45
 				};
 			}
 		}
 	});
 var _user$project$Command$updateDaemons = F3(
 	function (cycles, system, daemons) {
-		var _p29 = A3(
+		var _p48 = A3(
 			_elm_lang$core$List$foldl,
 			_user$project$Command$updateDaemon(cycles),
 			{
@@ -21026,9 +21134,9 @@ var _user$project$Command$updateDaemons = F3(
 				_2: {ctor: '[]'}
 			},
 			daemons);
-		var streams = _p29._0;
-		var system_ = _p29._1;
-		var daemons_ = _p29._2;
+		var streams = _p48._0;
+		var system_ = _p48._1;
+		var daemons_ = _p48._2;
 		return {
 			ctor: '_Tuple3',
 			_0: streams,
@@ -21040,90 +21148,87 @@ var _user$project$Command$updateDaemons = F3(
 			_2: {ctor: '[]'}
 		};
 	});
-var _user$project$Command$manString = A3(_elm_community$string_extra$String_Extra$replace, ' ', ' ', '\n  help           - print help to stdout\n  l              - show directory contents\n  ls             - show directory contents\n  pwd            - print working directory\n  cd [directory] - change directory\n  echo [string]  - send text to stdout\n  cat [file]     - send file contents to stdout\n  write [file]   - write stdin to file, if file doesn\'t exist\n  append [file]  - append stdin to file, if file exists\n  daemons        - show running processes\n  spawn [int] [string] (expr)\n                 - create a process, e.g.,\n                     (spawn 10 nuisance (echo blah))\n                     (spawn 1 catWriter (echo cat ! append hello))\n                   the parentheses can contain any valid expression that\n                   does not use spawn, with the pipe symbol `|` replaced by `!`\n  kill [string]  - kill process\n  [cmd] | [cmd]  - combine commands by piping stdout to stdin\n');
-var _user$project$Command$man = F2(
-	function (_p30, system) {
+var _user$project$Command$manString = A3(_elm_community$string_extra$String_Extra$replace, ' ', ' ', '\n  help           - print help to stdout\n  l              - show directory contents\n  ls             - show directory contents\n  pwd            - print working directory\n  cd [directory] - change directory\n  echo [string]  - send text to stdout\n  cat [file]     - send file contents to stdout\n  write [file]   - write stdin to file, if file doesn\'t exist\n  append [file]  - append stdin to file, if file exists\n  rm [file]      - remove file or directory\n  daemons        - show running processes\n  spawn [int] [string] (expr)\n                 - create a process, e.g.,\n                     (spawn 10 nuisance (echo blah))\n                     (spawn 1 catWriter (echo cat ! append hello))\n                   the parentheses can contain any valid expression that\n                   does not use spawn, with the pipe symbol `|` replaced by `!`\n  kill [string]  - kill process\n  [cmd] | [cmd]  - combine commands by piping stdout to stdin\n  compile [string] (expr)\n                 - create an executable with given name and send to stdout\n');
+var _user$project$Command$man = F3(
+	function (_p50, _p49, system) {
+		var _p51 = _p50;
 		return _elm_lang$core$Result$Ok(
-			{ctor: '_Tuple2', _0: _user$project$Command$manString, _1: system});
+			{
+				ctor: '_Tuple2',
+				_0: _p51.fromString(_user$project$Command$manString),
+				_1: system
+			});
 	});
-var _user$project$Command$parse = function (input) {
-	var commands = {
-		ctor: '::',
-		_0: A2(_user$project$Command$matchCommandArity0, '^$', _user$project$Command$doNothing),
-		_1: {
-			ctor: '::',
-			_0: A2(_user$project$Command$matchCommandArity0, '^ls$', _user$project$Command$lsCwd),
-			_1: {
-				ctor: '::',
-				_0: A2(_user$project$Command$matchCommandArity0, '^l$', _user$project$Command$lsCwd),
-				_1: {
-					ctor: '::',
-					_0: A2(_user$project$Command$matchCommandArity0, '^pwd$', _user$project$Command$pwd),
-					_1: {
-						ctor: '::',
-						_0: A2(_user$project$Command$matchCommandArity0, '^help$', _user$project$Command$man),
-						_1: {
-							ctor: '::',
-							_0: A2(_user$project$Command$matchCommandArity0, '^cd\\s+\\.\\.$', _user$project$Command$cdUp),
-							_1: {
-								ctor: '::',
-								_0: A2(_user$project$Command$matchCommandArity1, '^ls\\s+([\\w|\\.|/]+)', _user$project$Command$ls),
-								_1: {
-									ctor: '::',
-									_0: A2(_user$project$Command$matchCommandArity1, '^cd\\s+([\\w|\\.|/]+)', _user$project$Command$cd),
-									_1: {
-										ctor: '::',
-										_0: A2(_user$project$Command$matchCommandArity1, '^echo\\s+(.*)', _user$project$Command$echo),
-										_1: {
-											ctor: '::',
-											_0: A2(_user$project$Command$matchCommandArity1, '^cat\\s+([\\w|\\.|/]+)', _user$project$Command$cat),
-											_1: {
-												ctor: '::',
-												_0: A2(_user$project$Command$matchCommandArity1, '^write\\s+([\\w|\\.|/]+)', _user$project$Command$write),
-												_1: {
-													ctor: '::',
-													_0: A2(_user$project$Command$matchCommandArity1, '^append\\s+([\\w|\\.|/]+)', _user$project$Command$append),
-													_1: {
-														ctor: '::',
-														_0: A2(_user$project$Command$matchCommandArity0, '^daemons$', _user$project$Command$showDaemons),
-														_1: {
-															ctor: '::',
-															_0: A2(_user$project$Command$matchCommandArity1, '^kill\\s+([\\w|\\.|/]+)', _user$project$Command$kill),
-															_1: {
-																ctor: '::',
-																_0: A2(_user$project$Command$matchCommandArity3, '^spawn\\s+([0-9]+)\\s+(\\w+)\\s+\\(\\s*(.*?)\\s*\\)', _user$project$Command$spawn),
-																_1: {ctor: '[]'}
-															}
-														}
-													}
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
+var _user$project$Command$parseFiles = F3(
+	function (config, system, input) {
+		var isExecutable = function (x) {
+			var _p52 = x;
+			if (_p52.ctor === 'Executable') {
+				return _elm_lang$core$Maybe$Just(_p52._1);
+			} else {
+				return _elm_lang$core$Maybe$Nothing;
 			}
-		}
-	};
-	return A2(
-		_elm_lang$core$Maybe$withDefault,
-		_elm_lang$core$Maybe$Nothing,
-		A2(
-			_elm_lang$core$Maybe$map,
-			_elm_community$list_extra$List_Extra$foldl1(_user$project$Command$join),
-			A2(
-				_elm_community$maybe_extra$Maybe_Extra$traverse,
-				A2(_elm_lang$core$Basics$flip, _user$project$Command$traverse2, commands),
+		};
+		return A2(
+			_elm_lang$core$Maybe$andThen,
+			isExecutable,
+			_elm_lang$core$Result$toMaybe(
 				A2(
-					_elm_lang$core$List$map,
-					_elm_lang$core$String$trim,
-					A2(_elm_lang$core$String$split, '|', input)))));
-};
-var _user$project$Command$spawn = F5(
-	function (lifetime, daemonName, input, stream, system) {
+					_user$project$FileSystem$get,
+					_elm_lang$core$String$trim(input),
+					system)));
+	});
+var _user$project$Command$parse = F3(
+	function (config, system, input) {
+		var parsers = A2(
+			_elm_lang$core$List$map,
+			function (x) {
+				return A2(x, config, system);
+			},
+			function (_p53) {
+				var _p54 = _p53;
+				return _p54._0;
+			}(config.parsers));
+		return A2(
+			_elm_lang$core$Maybe$withDefault,
+			_elm_lang$core$Maybe$Nothing,
+			A2(
+				_elm_lang$core$Maybe$map,
+				_elm_community$list_extra$List_Extra$foldl1(_user$project$Command$join),
+				A2(
+					_elm_community$maybe_extra$Maybe_Extra$traverse,
+					A2(_elm_lang$core$Basics$flip, _user$project$Command$traverse2, parsers),
+					A2(
+						_elm_lang$core$List$map,
+						_elm_lang$core$String$trim,
+						A2(_elm_lang$core$String$split, '|', input)))));
+	});
+var _user$project$Command$execute = F3(
+	function (config, input, system) {
+		var _p55 = A3(_user$project$Command$parse, config, system, input);
+		if (_p55.ctor === 'Just') {
+			var _p56 = A2(_p55._0, config.$null, system);
+			if (_p56.ctor === 'Ok') {
+				return _p56._0;
+			} else {
+				return {
+					ctor: '_Tuple2',
+					_0: config.fromString(
+						A2(_elm_lang$core$Basics_ops['++'], 'Error: ', _p56._0)),
+					_1: system
+				};
+			}
+		} else {
+			return {
+				ctor: '_Tuple2',
+				_0: config.fromString(
+					A2(_elm_lang$core$Basics_ops['++'], 'Error: failed to parse ', input)),
+				_1: system
+			};
+		}
+	});
+var _user$project$Command$spawn = F6(
+	function (config, lifetime, daemonName, input, stream, system) {
 		var registerDaemon = function (daemon) {
 			return _elm_lang$core$Result$Ok(
 				{
@@ -21132,23 +21237,18 @@ var _user$project$Command$spawn = F5(
 					_1: _elm_lang$core$Native_Utils.update(
 						system,
 						{
-							daemons: {
-								ctor: '::',
-								_0: A2(_elm_lang$core$Debug$log, 'new d', daemon),
-								_1: system.daemons
-							}
+							daemons: {ctor: '::', _0: daemon, _1: system.daemons}
 						})
 				});
 		};
-		var stdin = '';
 		var innerDaemon = F2(
 			function (command, system_) {
-				var _p31 = A2(
+				var _p57 = A2(
 					_elm_lang$core$Result$withDefault,
-					{ctor: '_Tuple2', _0: '', _1: system_},
-					A2(command, stdin, system_));
-				var stream_ = _p31._0;
-				var system__ = _p31._1;
+					{ctor: '_Tuple2', _0: config.$null, _1: system_},
+					A2(command, config.$null, system_));
+				var stream_ = _p57._0;
+				var system__ = _p57._1;
 				return {
 					ctor: '_Tuple3',
 					_0: stream_,
@@ -21174,7 +21274,10 @@ var _user$project$Command$spawn = F5(
 				A2(
 					_elm_lang$core$Result$fromMaybe,
 					A2(_elm_lang$core$Basics_ops['++'], 'failed to parse command ', input),
-					_user$project$Command$parse(
+					A3(
+						_user$project$Command$parse,
+						config,
+						system,
 						A3(_elm_community$string_extra$String_Extra$replace, '!', '|', input))));
 		};
 		return A2(
@@ -21185,39 +21288,263 @@ var _user$project$Command$spawn = F5(
 				parseResult,
 				A2(
 					_elm_lang$core$Result$mapError,
-					function (_p32) {
-						return A2(
-							_elm_lang$core$Basics_ops['++'],
-							'lifetime ',
-							A2(_elm_lang$core$Basics_ops['++'], lifetime, 'is not an int'));
+					function (_p58) {
+						return A2(_elm_lang$core$Basics_ops['++'], lifetime, ' is not an integer');
 					},
-					_elm_lang$core$String$toInt(
-						A2(_elm_lang$core$Debug$log, 'l', lifetime)))));
+					_elm_lang$core$String$toInt(lifetime))));
 	});
-var _user$project$Command$execute = F2(
-	function (input, system) {
-		var _p33 = _user$project$Command$parse(input);
-		if (_p33.ctor === 'Just') {
-			var _p34 = A2(_p33._0, '', system);
-			if (_p34.ctor === 'Ok') {
-				return _p34._0;
-			} else {
-				return {
-					ctor: '_Tuple2',
-					_0: A2(_elm_lang$core$Basics_ops['++'], 'Error: ', _p34._0),
-					_1: system
-				};
+var _user$project$Command$parseCommands = F3(
+	function (config, _p59, input) {
+		var commands = {
+			ctor: '::',
+			_0: A2(_user$project$Command$matchCommandArity0, '^$', _user$project$Command$doNothing),
+			_1: {
+				ctor: '::',
+				_0: A2(
+					_user$project$Command$matchCommandArity0,
+					'^ls$',
+					_user$project$Command$lsCwd(config)),
+				_1: {
+					ctor: '::',
+					_0: A2(
+						_user$project$Command$matchCommandArity0,
+						'^l$',
+						_user$project$Command$lsCwd(config)),
+					_1: {
+						ctor: '::',
+						_0: A2(
+							_user$project$Command$matchCommandArity0,
+							'^pwd$',
+							_user$project$Command$pwd(config)),
+						_1: {
+							ctor: '::',
+							_0: A2(
+								_user$project$Command$matchCommandArity0,
+								'^help$',
+								_user$project$Command$man(config)),
+							_1: {
+								ctor: '::',
+								_0: A2(_user$project$Command$matchCommandArity0, '^cd\\s+\\.\\.$', _user$project$Command$cdUp),
+								_1: {
+									ctor: '::',
+									_0: A2(_user$project$Command$matchCommandArity1, '^cd\\s+([\\w|\\.|/]+)$', _user$project$Command$cd),
+									_1: {
+										ctor: '::',
+										_0: A2(
+											_user$project$Command$matchCommandArity1,
+											'^ls\\s+([\\w|\\.|/]+)$',
+											_user$project$Command$ls(config)),
+										_1: {
+											ctor: '::',
+											_0: A2(
+												_user$project$Command$matchCommandArity1,
+												'^echo\\s+\\\"(.*)\\\"$',
+												_user$project$Command$echo(config)),
+											_1: {
+												ctor: '::',
+												_0: A2(
+													_user$project$Command$matchCommandArity1,
+													'^echo\\s+(.*)$',
+													_user$project$Command$echo(config)),
+												_1: {
+													ctor: '::',
+													_0: A2(_user$project$Command$matchCommandArity1, '^cat\\s+([\\w|\\.|/]+)$', _user$project$Command$cat),
+													_1: {
+														ctor: '::',
+														_0: A2(
+															_user$project$Command$matchCommandArity1,
+															'^write\\s+([\\w|\\.\\*|/]+)$',
+															_user$project$Command$write(config)),
+														_1: {
+															ctor: '::',
+															_0: A2(
+																_user$project$Command$matchCommandArity1,
+																'^append\\s+([\\w|\\.|/]+)$',
+																_user$project$Command$append(config)),
+															_1: {
+																ctor: '::',
+																_0: A2(
+																	_user$project$Command$matchCommandArity1,
+																	'^rm\\s+([\\w|\\.|/]+)$',
+																	_user$project$Command$rm(config)),
+																_1: {
+																	ctor: '::',
+																	_0: A2(
+																		_user$project$Command$matchCommandArity1,
+																		'^compile\\s+(\\w+)$',
+																		_user$project$Command$compile(config)),
+																	_1: {
+																		ctor: '::',
+																		_0: A2(
+																			_user$project$Command$matchCommandArity0,
+																			'^daemons$',
+																			_user$project$Command$showDaemons(config)),
+																		_1: {
+																			ctor: '::',
+																			_0: A2(
+																				_user$project$Command$matchCommandArity1,
+																				'^kill\\s+([\\w|\\.|/]+)$',
+																				_user$project$Command$kill(config)),
+																			_1: {
+																				ctor: '::',
+																				_0: A2(
+																					_user$project$Command$matchCommandArity3,
+																					'^spawn\\s+(\\w+)\\s+(\\w+)\\s+\\(\\s*(.*?)\\s*\\)$',
+																					_user$project$Command$spawn(config)),
+																				_1: {ctor: '[]'}
+																			}
+																		}
+																	}
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
 			}
-		} else {
-			return {
-				ctor: '_Tuple2',
-				_0: A2(_elm_lang$core$Basics_ops['++'], 'Error: failed to parse ', input),
-				_1: system
-			};
-		}
+		};
+		return A2(_user$project$Command$traverse2, input, commands);
 	});
 var _user$project$Command$main = _elm_lang$virtual_dom$Native_VirtualDom.staticProgram(
 	_elm_lang$html$Html$text(''));
+var _user$project$Command$Config = F6(
+	function (a, b, c, d, e, f) {
+		return {$null: a, fromString: b, toString: c, append: d, compile: e, parsers: f};
+	});
+var _user$project$Command$Executable = F2(
+	function (a, b) {
+		return {ctor: 'Executable', _0: a, _1: b};
+	});
+var _user$project$Command$Stream = function (a) {
+	return {ctor: 'Stream', _0: a};
+};
+var _user$project$Command$Parsers = function (a) {
+	return {ctor: 'Parsers', _0: a};
+};
+var _user$project$Command$stringConfig = {
+	$null: '',
+	fromString: _elm_lang$core$Basics$identity,
+	compile: F3(
+		function (name, system, a) {
+			return _elm_lang$core$Result$Err('Not implemented');
+		}),
+	append: F2(
+		function (x, y) {
+			return A2(_elm_lang$core$Basics_ops['++'], x, y);
+		}),
+	toString: _elm_lang$core$Basics$identity,
+	parsers: _user$project$Command$Parsers(
+		{
+			ctor: '::',
+			_0: _user$project$Command$parseCommands,
+			_1: {ctor: '[]'}
+		})
+};
+var _user$project$Command$blah = _user$project$Command$Parsers(
+	{
+		ctor: '::',
+		_0: _user$project$Command$parseCommands,
+		_1: {ctor: '[]'}
+	});
+var _user$project$Command$fileConfig = function () {
+	var append = F2(
+		function (x, y) {
+			var _p60 = {ctor: '_Tuple2', _0: x, _1: y};
+			if (_p60._0.ctor === 'Stream') {
+				if (_p60._1.ctor === 'Stream') {
+					return _user$project$Command$Stream(
+						A2(_elm_lang$core$Basics_ops['++'], _p60._0._0, _p60._1._0));
+				} else {
+					var _p61 = _p60._0._0;
+					return A2(
+						_user$project$Command$Executable,
+						A2(
+							_elm_lang$core$Basics_ops['++'],
+							_p60._1._0,
+							A2(
+								_elm_lang$core$Basics_ops['++'],
+								'(',
+								A2(_elm_lang$core$Basics_ops['++'], _p61, ')'))),
+						A2(
+							_user$project$Command$join,
+							A2(_user$project$Command$echo, _user$project$Command$fileConfig, _p61),
+							_p60._1._1));
+				}
+			} else {
+				if (_p60._1.ctor === 'Executable') {
+					return A2(
+						_user$project$Command$Executable,
+						A2(
+							_elm_lang$core$Basics_ops['++'],
+							_p60._0._0,
+							A2(_elm_lang$core$Basics_ops['++'], ':', _p60._1._0)),
+						A2(_user$project$Command$join, _p60._0._1, _p60._1._1));
+				} else {
+					return _user$project$Command$Stream(_p60._1._0);
+				}
+			}
+		});
+	var compile = F3(
+		function (name, system, input) {
+			var _p62 = input;
+			if (_p62.ctor === 'Executable') {
+				return _elm_lang$core$Result$Ok(input);
+			} else {
+				var _p65 = _p62._0;
+				return A2(
+					_elm_lang$core$Result$map,
+					function (x) {
+						return A2(_user$project$Command$Executable, name, x);
+					},
+					A2(
+						_elm_lang$core$Result$fromMaybe,
+						A2(_elm_lang$core$Basics_ops['++'], 'failed to parse ', _p65),
+						A2(
+							_elm_community$maybe_extra$Maybe_Extra$orElseLazy,
+							function (_p63) {
+								var _p64 = _p63;
+								return A3(_user$project$Command$parseFiles, _user$project$Command$fileConfig, system, _p65);
+							},
+							A3(
+								_user$project$Command$parse,
+								_user$project$Command$fileConfig,
+								system,
+								A3(_elm_community$string_extra$String_Extra$replace, '!', '|', _p65)))));
+			}
+		});
+	var toString = function (x) {
+		var _p66 = x;
+		if (_p66.ctor === 'Stream') {
+			return _p66._0;
+		} else {
+			return A2(_elm_lang$core$Basics_ops['++'], 'Executable: ', _p66._0);
+		}
+	};
+	return {
+		$null: _user$project$Command$Stream(''),
+		fromString: _user$project$Command$Stream,
+		append: append,
+		toString: toString,
+		compile: compile,
+		parsers: _user$project$Command$Parsers(
+			{
+				ctor: '::',
+				_0: _user$project$Command$parseCommands,
+				_1: {
+					ctor: '::',
+					_0: _user$project$Command$parseFiles,
+					_1: {ctor: '[]'}
+				}
+			})
+	};
+}();
 var _user$project$MyCss$primaryAccentColor = _rtfeldman$elm_css$Css$hex('ccffaa');
 var _user$project$MyCss$fullWindow = {
 	ctor: '::',
@@ -21391,13 +21718,16 @@ var _user$project$Terminal$breakText = function (string) {
 				_elm_lang$html$Html$text,
 				A2(_elm_lang$core$String$split, '\n', string))));
 };
-var _user$project$Terminal$printEntry = F2(
-	function (prompt, entry) {
+var _user$project$Terminal$printEntry = F3(
+	function (config, prompt, entry) {
 		var _p0 = entry;
 		if (_p0.ctor === 'Input') {
-			return A2(_elm_lang$core$Basics_ops['++'], prompt, _p0._0);
+			return A2(
+				_elm_lang$core$Basics_ops['++'],
+				prompt,
+				config.toString(_p0._0));
 		} else {
-			return _p0._0;
+			return config.toString(_p0._0);
 		}
 	});
 var _user$project$Terminal$prompt = '$ ';
@@ -21449,11 +21779,12 @@ var _user$project$Terminal$updateBuffer = F2(
 						_elm_lang$core$Char$fromCode(key)));
 		}
 	});
+var _user$project$Terminal$config = _user$project$Command$stringConfig;
 var _user$project$Terminal$init = function () {
 	var daemons = {
 		ctor: '::',
 		_0: {
-			daemon: A2(_user$project$Command$catDaemon, '/usr/litter', 'lo'),
+			daemon: A3(_user$project$Command$catDaemon, _user$project$Terminal$config, '/usr/litter', 'lo'),
 			name: 'kitty',
 			lifetime: 100
 		},
@@ -21474,83 +21805,81 @@ var _user$project$Terminal$init = function () {
 			{daemons: daemons})
 	};
 }();
-var _user$project$Terminal$Model = F3(
+var _user$project$Terminal$Terminal = F3(
 	function (a, b, c) {
 		return {history: a, system: b, buffer: c};
 	});
 var _user$project$Terminal$Output = function (a) {
 	return {ctor: 'Output', _0: a};
 };
-var _user$project$Terminal$printDaemonOutput = function (streams) {
-	var screams = A2(
-		_elm_lang$core$List$map,
-		_user$project$Terminal$Output,
-		A2(
-			_elm_lang$core$List$filter,
-			F2(
-				function (x, y) {
-					return !_elm_lang$core$Native_Utils.eq(x, y);
-				})(''),
-			streams));
-	var _p4 = screams;
-	if (_p4.ctor === '[]') {
-		return {ctor: '[]'};
-	} else {
-		return _elm_lang$core$List$reverse(
-			{
-				ctor: '::',
-				_0: _user$project$Terminal$Output('--- daemons speak ---'),
-				_1: _p4
-			});
-	}
-};
+var _user$project$Terminal$printDaemonOutput = F2(
+	function (config, streams) {
+		var screams = A2(
+			_elm_lang$core$List$map,
+			_user$project$Terminal$Output,
+			A2(
+				_elm_lang$core$List$filter,
+				F2(
+					function (x, y) {
+						return !_elm_lang$core$Native_Utils.eq(x, y);
+					})(config.$null),
+				streams));
+		var _p4 = screams;
+		if (_p4.ctor === '[]') {
+			return {ctor: '[]'};
+		} else {
+			return _elm_lang$core$List$reverse(
+				{
+					ctor: '::',
+					_0: _user$project$Terminal$Output(
+						config.fromString('--- daemons speak ---')),
+					_1: _p4
+				});
+		}
+	});
 var _user$project$Terminal$Input = function (a) {
 	return {ctor: 'Input', _0: a};
 };
-var _user$project$Terminal$view = function (model) {
-	var mainStyle = A2(
-		_elm_lang$core$Basics_ops['++'],
-		_user$project$MyCss$backgroundStyle,
-		A2(_elm_lang$core$Basics_ops['++'], _user$project$MyCss$terminalText, _user$project$MyCss$fullWindow));
-	var emptyOutput = function (s) {
-		var _p5 = s;
-		if ((_p5.ctor === 'Output') && (_p5._0 === '')) {
-			return true;
-		} else {
-			return false;
-		}
-	};
-	var history = A2(
-		_elm_lang$core$String$join,
-		'\n',
-		A2(
-			_elm_lang$core$List$map,
-			_user$project$Terminal$printEntry(_user$project$Terminal$prompt),
+var _user$project$Terminal$view = F2(
+	function (config, model) {
+		var mainStyle = A2(
+			_elm_lang$core$Basics_ops['++'],
+			_user$project$MyCss$backgroundStyle,
+			A2(_elm_lang$core$Basics_ops['++'], _user$project$MyCss$terminalText, _user$project$MyCss$fullWindow));
+		var history = A2(
+			_elm_lang$core$String$join,
+			'\n',
 			A2(
-				_elm_lang$core$List$filter,
-				function (_p6) {
-					return !emptyOutput(_p6);
-				},
-				_elm_lang$core$List$reverse(
-					{
-						ctor: '::',
-						_0: _user$project$Terminal$Input(
-							A2(_elm_lang$core$Basics_ops['++'], model.buffer, _user$project$Terminal$cursor)),
-						_1: model.history
-					}))));
-	return A2(
-		_elm_lang$html$Html$div,
-		{
-			ctor: '::',
-			_0: _user$project$MyCss$styles(mainStyle),
-			_1: {ctor: '[]'}
-		},
-		{
-			ctor: '::',
-			_0: _user$project$Terminal$breakText(history),
-			_1: {ctor: '[]'}
-		});
-};
+				_elm_lang$core$List$map,
+				A2(_user$project$Terminal$printEntry, config, _user$project$Terminal$prompt),
+				A2(
+					_elm_lang$core$List$filter,
+					F2(
+						function (x, y) {
+							return !_elm_lang$core$Native_Utils.eq(x, y);
+						})(
+						_user$project$Terminal$Output(config.$null)),
+					_elm_lang$core$List$reverse(
+						{
+							ctor: '::',
+							_0: _user$project$Terminal$Input(
+								config.fromString(
+									A2(_elm_lang$core$Basics_ops['++'], model.buffer, _user$project$Terminal$cursor))),
+							_1: model.history
+						}))));
+		return A2(
+			_elm_lang$html$Html$div,
+			{
+				ctor: '::',
+				_0: _user$project$MyCss$styles(mainStyle),
+				_1: {ctor: '[]'}
+			},
+			{
+				ctor: '::',
+				_0: _user$project$Terminal$breakText(history),
+				_1: {ctor: '[]'}
+			});
+	});
 var _user$project$Terminal$Tick = function (a) {
 	return {ctor: 'Tick', _0: a};
 };
@@ -21564,15 +21893,15 @@ var _user$project$Terminal$update = F2(
 	function (msg, model) {
 		update:
 		while (true) {
-			var _p7 = msg;
-			switch (_p7.ctor) {
+			var _p5 = msg;
+			switch (_p5.ctor) {
 				case 'Tick':
-					var _p8 = A3(_user$project$Command$updateDaemons, 1, model.system, model.system.daemons);
-					var streams = _p8._0;
-					var system = _p8._1;
+					var _p6 = A3(_user$project$Command$updateDaemons, 1, model.system, model.system.daemons);
+					var streams = _p6._0;
+					var system = _p6._1;
 					var history = A2(
 						_elm_lang$core$Basics_ops['++'],
-						_user$project$Terminal$printDaemonOutput(streams),
+						A2(_user$project$Terminal$printDaemonOutput, _user$project$Terminal$config, streams),
 						model.history);
 					return A2(
 						_elm_lang$core$Platform_Cmd_ops['!'],
@@ -21586,23 +21915,23 @@ var _user$project$Terminal$update = F2(
 						_elm_lang$core$Native_Utils.update(
 							model,
 							{
-								buffer: A2(_user$project$Terminal$updateBuffer, _p7._0, model.buffer)
+								buffer: A2(_user$project$Terminal$updateBuffer, _p5._0, model.buffer)
 							}),
 						{ctor: '[]'});
 				default:
-					var _p11 = _p7._0;
-					var _p9 = _p11;
-					switch (_p9) {
+					var _p9 = _p5._0;
+					var _p7 = _p9;
+					switch (_p7) {
 						case 8:
-							var _v8 = _user$project$Terminal$KeyPress(_p11),
-								_v9 = model;
-							msg = _v8;
-							model = _v9;
+							var _v7 = _user$project$Terminal$KeyPress(_p9),
+								_v8 = model;
+							msg = _v7;
+							model = _v8;
 							continue update;
 						case 13:
-							var _p10 = A2(_user$project$Command$execute, model.buffer, model.system);
-							var stdout = _p10._0;
-							var system = _p10._1;
+							var _p8 = A3(_user$project$Command$execute, _user$project$Terminal$config, model.buffer, model.system);
+							var stdout = _p8._0;
+							var system = _p8._1;
 							var history = {
 								ctor: '::',
 								_0: _user$project$Terminal$Output(stdout),
@@ -21624,7 +21953,7 @@ var _user$project$Terminal$update = F2(
 								_elm_lang$core$Native_Utils.update(
 									model,
 									{
-										buffer: A3(_user$project$Terminal$updateBufferDown, _p11, model.buffer, model.history)
+										buffer: A3(_user$project$Terminal$updateBufferDown, _p9, model.buffer, model.history)
 									}),
 								{ctor: '[]'});
 					}
@@ -21654,13 +21983,187 @@ var _user$project$Terminal$main = _elm_lang$html$Html$program(
 			_user$project$Terminal$init,
 			{ctor: '[]'}),
 		update: _user$project$Terminal$update,
-		view: _user$project$Terminal$view,
+		view: _user$project$Terminal$view(_user$project$Terminal$config),
 		subscriptions: _user$project$Terminal$subscriptions
 	})();
+var _user$project$App$breakText = function (string) {
+	return function (x) {
+		return A2(
+			_elm_lang$html$Html$div,
+			{ctor: '[]'},
+			x);
+	}(
+		A2(
+			_elm_lang$core$List$intersperse,
+			A2(
+				_elm_lang$html$Html$br,
+				{ctor: '[]'},
+				{ctor: '[]'}),
+			A2(
+				_elm_lang$core$List$map,
+				_elm_lang$html$Html$text,
+				A2(_elm_lang$core$String$split, '\n', string))));
+};
+var _user$project$App$mapEntry = F2(
+	function (f, entry) {
+		var _p0 = entry;
+		if (_p0.ctor === 'Input') {
+			return _user$project$Terminal$Input(
+				f(_p0._0));
+		} else {
+			return _user$project$Terminal$Output(
+				f(_p0._0));
+		}
+	});
+var _user$project$App$init = function () {
+	var daemons = {
+		ctor: '::',
+		_0: {
+			daemon: A3(
+				_user$project$Command$catDaemon,
+				_user$project$Command$fileConfig,
+				'/usr/litter',
+				_user$project$Command$Stream('lo')),
+			name: 'kitty',
+			lifetime: 100
+		},
+		_1: {ctor: '[]'}
+	};
+	var f = function (name) {
+		return A2(
+			_user$project$FileSystem$unsafeAddFile,
+			name,
+			_user$project$Command$Stream(
+				_elm_lang$core$String$toUpper(name)));
+	};
+	var system = A3(_elm_lang$core$List$foldl, f, _user$project$FileSystem$emptySystem, _user$project$FileSystem$files);
+	return {
+		history: {ctor: '[]'},
+		buffer: 'echo \"echo 4\" | compile anon | write exec',
+		system: _elm_lang$core$Native_Utils.update(
+			system,
+			{daemons: daemons})
+	};
+}();
+var _user$project$App$config = _user$project$Command$fileConfig;
+var _user$project$App$executeBuffer = function (model) {
+	var _p1 = A3(_user$project$Command$execute, _user$project$App$config, model.buffer, model.system);
+	var stdout = _p1._0;
+	var system = _p1._1;
+	var history = {
+		ctor: '::',
+		_0: _user$project$Terminal$Output(stdout),
+		_1: {
+			ctor: '::',
+			_0: _user$project$Terminal$Input(
+				_user$project$App$config.fromString(model.buffer)),
+			_1: model.history
+		}
+	};
+	return _elm_lang$core$Native_Utils.update(
+		model,
+		{history: history, system: system, buffer: ''});
+};
+var _user$project$App$update = F2(
+	function (msg, model) {
+		var _p2 = msg;
+		switch (_p2.ctor) {
+			case 'Tick':
+				var _p3 = A3(_user$project$Command$updateDaemons, 1, model.system, model.system.daemons);
+				var streams = _p3._0;
+				var system = _p3._1;
+				var history = A2(
+					_elm_lang$core$Basics_ops['++'],
+					A2(_user$project$Terminal$printDaemonOutput, _user$project$App$config, streams),
+					model.history);
+				return _elm_lang$core$Native_Utils.update(
+					model,
+					{system: system, history: history});
+			case 'KeyPress':
+				return _elm_lang$core$Native_Utils.update(
+					model,
+					{
+						buffer: A2(_user$project$Terminal$updateBuffer, _p2._0, model.buffer)
+					});
+			case 'KeyDown':
+				return _elm_lang$core$Native_Utils.update(
+					model,
+					{
+						buffer: A3(
+							_user$project$Terminal$updateBufferDown,
+							_p2._0,
+							model.buffer,
+							A2(
+								_elm_lang$core$List$map,
+								_user$project$App$mapEntry(_user$project$App$config.toString),
+								model.history))
+					});
+			default:
+				return _user$project$App$executeBuffer(model);
+		}
+	});
+var _user$project$App$Execute = function (a) {
+	return {ctor: 'Execute', _0: a};
+};
+var _user$project$App$Tick = function (a) {
+	return {ctor: 'Tick', _0: a};
+};
+var _user$project$App$KeyDown = function (a) {
+	return {ctor: 'KeyDown', _0: a};
+};
+var _user$project$App$KeyPress = function (a) {
+	return {ctor: 'KeyPress', _0: a};
+};
+var _user$project$App$downSub = F2(
+	function (_p4, key) {
+		var _p5 = _p4;
+		var _p6 = key;
+		switch (_p6) {
+			case 8:
+				return _user$project$App$KeyPress(8);
+			case 13:
+				return _user$project$App$Execute(_p5.buffer);
+			default:
+				return _user$project$App$KeyDown(_p6);
+		}
+	});
+var _user$project$App$subscriptions = function (model) {
+	return _elm_lang$core$Platform_Sub$batch(
+		{
+			ctor: '::',
+			_0: _elm_lang$keyboard$Keyboard$downs(
+				_user$project$App$downSub(model)),
+			_1: {
+				ctor: '::',
+				_0: _elm_lang$keyboard$Keyboard$presses(_user$project$App$KeyPress),
+				_1: {
+					ctor: '::',
+					_0: A2(_elm_lang$core$Time$every, _elm_lang$core$Time$second, _user$project$App$Tick),
+					_1: {ctor: '[]'}
+				}
+			}
+		});
+};
+var _user$project$App$main = _elm_lang$html$Html$program(
+	{
+		init: A2(
+			_elm_lang$core$Platform_Cmd_ops['!'],
+			_user$project$App$init,
+			{ctor: '[]'}),
+		update: F2(
+			function (a, b) {
+				return A2(
+					_elm_lang$core$Platform_Cmd_ops['!'],
+					A2(_user$project$App$update, a, b),
+					{ctor: '[]'});
+			}),
+		view: _user$project$Terminal$view(_user$project$App$config),
+		subscriptions: _user$project$App$subscriptions
+	})();
 var Elm = {};
-Elm['Terminal'] = Elm['Terminal'] || {};
-if (typeof _user$project$Terminal$main !== 'undefined') {
-    _user$project$Terminal$main(Elm['Terminal'], 'Terminal', {"types":{"unions":{"Terminal.Msg":{"args":[],"tags":{"Tick":["Time.Time"],"KeyDown":["Keyboard.KeyCode"],"KeyPress":["Keyboard.KeyCode"]}}},"aliases":{"Keyboard.KeyCode":{"args":[],"type":"Int"},"Time.Time":{"args":[],"type":"Float"}},"message":"Terminal.Msg"},"versions":{"elm":"0.18.0"}});
+Elm['App'] = Elm['App'] || {};
+if (typeof _user$project$App$main !== 'undefined') {
+    _user$project$App$main(Elm['App'], 'App', {"types":{"unions":{"App.Msg":{"args":[],"tags":{"Execute":["String"],"Tick":["Time.Time"],"KeyDown":["Keyboard.KeyCode"],"KeyPress":["Keyboard.KeyCode"]}}},"aliases":{"Keyboard.KeyCode":{"args":[],"type":"Int"},"Time.Time":{"args":[],"type":"Float"}},"message":"App.Msg"},"versions":{"elm":"0.18.0"}});
 }
 
 if (typeof define === "function" && define['amd'])
@@ -21692,4 +22195,4 @@ for (var publicModule in Elm)
 }
 
 }).call(this);
-</script></head><body><script type="text/javascript">Elm.Terminal.fullscreen()</script></body></html>
+</script></head><body><script type="text/javascript">Elm.App.fullscreen()</script></body></html>

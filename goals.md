@@ -8,15 +8,25 @@ medium:
 - cursor over command/stream => visual
 
 ### commands
-- save commands to FileSystem as executables
+- compile commands to FileSystem as executables
 - cat executable -> name?
-- provide "null" to stream
+- make commands more generic with Config a =
+    - {null : a, fromString : String -> a, append: a -> a -> a}
+- need to provide a FileSystem and view map (toString, toHtml, etc)
+
 type File = Executable Name CommandIO | Stream String
+
+compile (expr)
+- echo command, upgrade config.fromString to recognize functions
+- compile command, passes string and system to config.compile
+   - advantageous if we want to compile differently across configs
+- compile command, do the compilation and map result with config.fromIOCommand
+
 
 library:
 - ok: ls, cat, echo, pwd, cd, write
-- ok: spawn, daemons
-- todo: grep, xargs?
+- ok: spawn, daemons, kill
+- todo: compile, grep, xargs?
 
 
 ### execution

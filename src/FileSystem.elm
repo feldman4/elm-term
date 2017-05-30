@@ -234,3 +234,16 @@ get name system =
 
         Just Nothing ->
             Result.Err "Is a directory"
+
+
+remove : Name -> FlatSystem a u -> FlatSystem a u
+remove name system =
+    let
+        name_ =
+            makeAbsolute name system
+
+        keep s _ =
+            s :: (getParents s) |> List.any ((==) name_) |> not
+    in
+        Dict.filter keep system.storage
+            |> (\x -> { system | storage = x })

@@ -1,12 +1,17 @@
-module Terminal exposing (..)
+module Terminal exposing (updateBuffer, updateBufferDown, Entry(..), Terminal, printDaemonOutput, view)
 
 import Html exposing (text, button, div, br)
 import MyCss exposing (..)
 import Keyboard exposing (KeyCode)
 import Char
 import FileSystem exposing (FileSystem, Daemon(..), addFile, unsafeAddFile, files, emptySystem)
-import Command exposing (execute, catDaemon, updateDaemons)
+import Command exposing (execute, catDaemon, updateDaemons, stringConfig, Config)
 import Time exposing (Time)
+
+
+config : Config String
+config =
+    stringConfig
 
 
 main : Program Never Model Msg
@@ -14,7 +19,7 @@ main =
     Html.program
         { init = init ! []
         , update = update
-        , view = view
+        , view = view config
         , subscriptions = subscriptions
         }
 
@@ -29,7 +34,7 @@ init =
             List.foldl f emptySystem files
 
         daemons =
-            [ { daemon = catDaemon "/usr/litter" "lo", name = "kitty", lifetime = 100 } ]
+            [ { daemon = catDaemon config "/usr/litter" "lo", name = "kitty", lifetime = 100 } ]
     in
         { history = []
         , buffer =
@@ -40,8 +45,12 @@ init =
 
 
 type alias Model =
-    { history : List (Entry String)
-    , system : FileSystem String
+    Terminal String
+
+
+type alias Terminal a =
+    { history : List (Entry a)
+    , system : FileSystem a
     , buffer : String
     }
 
@@ -70,7 +79,7 @@ update msg model =
                     updateDaemons 1 model.system model.system.daemons
 
                 history =
-                    (printDaemonOutput streams) ++ model.history
+                    (printDaemonOutput config streams) ++ model.history
             in
                 ({ model | system = system, history = history }) ! []
 
@@ -85,7 +94,7 @@ update msg model =
                 13 ->
                     let
                         ( stdout, system ) =
-                            execute model.buffer model.system
+                            execute config model.buffer model.system
 
                         history =
                             Output stdout :: Input model.buffer :: model.history
@@ -149,23 +158,15 @@ prompt =
     "$ "
 
 
-view : Model -> Html.Html Msg
-view model =
+view : Config a -> Terminal a -> Html.Html msg
+view config model =
     let
-        emptyOutput s =
-            case s of
-                Output "" ->
-                    True
-
-                _ ->
-                    False
-
         history =
-            Input (model.buffer ++ cursor)
+            Input (config.fromString (model.buffer ++ cursor))
                 :: model.history
                 |> List.reverse
-                |> List.filter (not << emptyOutput)
-                |> List.map (printEntry prompt)
+                |> List.filter ((/=) (Output config.null))
+                |> List.map (printEntry config prompt)
                 |> String.join "\n"
 
         mainStyle =
@@ -174,12 +175,12 @@ view model =
         div [ styles mainStyle ] [ breakText history ]
 
 
-printDaemonOutput : List String -> List (Entry String)
-printDaemonOutput streams =
+printDaemonOutput : Config a -> List a -> List (Entry a)
+printDaemonOutput config streams =
     let
         screams =
             streams
-                |> List.filter ((/=) "")
+                |> List.filter ((/=) config.null)
                 |> List.map Output
     in
         case screams of
@@ -187,17 +188,68 @@ printDaemonOutput streams =
                 []
 
             xs ->
-                Output "--- daemons speak ---" :: xs |> List.reverse
+                Output (config.fromString "--- daemons speak ---") :: xs |> List.reverse
 
 
-printEntry : String -> Entry String -> String
-printEntry prompt entry =
+printEntry : Config a -> String -> Entry a -> String
+printEntry config prompt entry =
     case entry of
         Input s ->
-            prompt ++ s
+            prompt ++ (config.toString s)
 
         Output s ->
-            s
+            (config.toString s)
+
+
+
+-- view : Model -> Html.Html Msg
+-- view model =
+--     let
+--         emptyOutput s =
+--             case s of
+--                 Output "" ->
+--                     True
+--
+--                 _ ->
+--                     False
+--
+--         history =
+--             Input (model.buffer ++ cursor)
+--                 :: model.history
+--                 |> List.reverse
+--                 |> List.filter (not << emptyOutput)
+--                 |> List.map (printEntry prompt)
+--                 |> String.join "\n"
+--
+--         mainStyle =
+--             backgroundStyle ++ terminalText ++ fullWindow
+--     in
+--         div [ styles mainStyle ] [ breakText history ]
+--
+-- printDaemonOutput : List String -> List (Entry String)
+-- printDaemonOutput streams =
+--     let
+--         screams =
+--             streams
+--                 |> List.filter ((/=) "")
+--                 |> List.map Output
+--     in
+--         case screams of
+--             [] ->
+--                 []
+--
+--             xs ->
+--                 Output "--- daemons speak ---" :: xs |> List.reverse
+--
+--
+-- printEntry : String -> Entry String -> String
+-- printEntry prompt entry =
+--     case entry of
+--         Input s ->
+--             prompt ++ s
+--
+--         Output s ->
+--             s
 
 
 breakText : String -> Html.Html msg

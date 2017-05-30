@@ -16,7 +16,94 @@ main =
 
 
 
+-- string system
+
+
+stringConfig : Config String
+stringConfig =
+    { null = ""
+    , fromString = identity
+    , compile = (\name system a -> Err "Not implemented")
+    , append = (++)
+    , toString = identity
+    , parsers = Parsers [ parseCommands ]
+    }
+
+
+
+-- string and executable system
+
+
+type File
+    = Stream String
+    | Executable String (IOCommand File)
+
+
+fileConfig : Config File
+fileConfig =
+    let
+        toString x =
+            case x of
+                Stream s ->
+                    s
+
+                Executable name _ ->
+                    "Executable: " ++ name
+
+        compile name system input =
+            case input of
+                Executable _ command ->
+                    Result.Ok (Executable name command)
+
+                Stream expr ->
+                    expr
+                        |> String.Extra.replace "!" "|"
+                        |> parse fileConfig system
+                        |> Maybe.Extra.orElseLazy (\() -> parseFiles fileConfig system expr)
+                        |> Result.fromMaybe ("failed to parse " ++ expr)
+                        |> Result.map (\x -> Executable name x)
+
+        append x y =
+            case ( x, y ) of
+                ( Stream a, Stream b ) ->
+                    Stream (a ++ b)
+
+                ( Executable a f, Executable b g ) ->
+                    Executable (a ++ ":" ++ b) (join f g)
+
+                ( Stream a, Executable b g ) ->
+                    Executable (b ++ "(" ++ a ++ ")") (join (echo fileConfig a) g)
+
+                ( Executable a f, Stream b ) ->
+                    Stream b
+    in
+        { null = Stream ""
+        , fromString = Stream
+        , append = append
+        , toString = toString
+        , compile = compile
+        , parsers = Parsers [ parseCommands, parseFiles ]
+        }
+
+
+
 -- TOP LEVEL
+
+
+parse : Config a -> FileSystem a -> String -> Maybe (IOCommand a)
+parse config system input =
+    let
+        parsers =
+            config.parsers
+                |> (\(Parsers p) -> p)
+                |> List.map (\x -> x config system)
+    in
+        input
+            |> String.split "|"
+            |> List.map String.trim
+            |> Maybe.Extra.traverse ((flip traverse2) parsers)
+            |> Maybe.map (List.Extra.foldl1 join)
+            |> Maybe.withDefault Nothing
 
 
 {-|
@@ -25,36 +112,54 @@ main =
 - register commands as simple matchers
 - including ls => a becomes String
 -}
-parse : String -> Maybe (IOCommand String)
-parse input =
+parseCommands : Config a -> FileSystem a -> String -> Maybe (IOCommand a)
+parseCommands config _ input =
     let
         commands =
             [ -- navigate
               matchCommandArity0 "^$" doNothing
-            , matchCommandArity0 "^ls$" lsCwd
-            , matchCommandArity0 "^l$" lsCwd
-            , matchCommandArity0 "^pwd$" pwd
-            , matchCommandArity0 "^help$" man
+            , matchCommandArity0 "^ls$" (lsCwd config)
+            , matchCommandArity0 "^l$" (lsCwd config)
+            , matchCommandArity0 "^pwd$" (pwd config)
+            , matchCommandArity0 "^help$" (man config)
             , matchCommandArity0 "^cd\\s+\\.\\.$" cdUp
-            , matchCommandArity1 "^ls\\s+([\\w|\\.|/]+)" ls
-            , matchCommandArity1 "^cd\\s+([\\w|\\.|/]+)" cd
+            , matchCommandArity1 "^cd\\s+([\\w|\\.|/]+)$" cd
+            , matchCommandArity1 "^ls\\s+([\\w|\\.|/]+)$" (ls config)
               -- manipulate files
-            , matchCommandArity1 "^echo\\s+(.*)" echo
-            , matchCommandArity1 "^cat\\s+([\\w|\\.|/]+)" cat
-            , matchCommandArity1 "^write\\s+([\\w|\\.|/]+)" write
-            , matchCommandArity1 "^append\\s+([\\w|\\.|/]+)" append
+            , matchCommandArity1 "^echo\\s+\\\"(.*)\\\"$" (echo config)
+            , matchCommandArity1 "^echo\\s+(.*)$" (echo config)
+            , matchCommandArity1 "^cat\\s+([\\w|\\.|/]+)$" cat
+            , matchCommandArity1 "^write\\s+([\\w|\\.\\*|/]+)$" (write config)
+            , matchCommandArity1 "^append\\s+([\\w|\\.|/]+)$" (append config)
+            , matchCommandArity1 "^rm\\s+([\\w|\\.|/]+)$" (rm config)
+              -- compile
+            , matchCommandArity1 "^compile\\s+(\\w+)$" (compile config)
               -- daemons
-            , matchCommandArity0 "^daemons$" showDaemons
-            , matchCommandArity1 "^kill\\s+([\\w|\\.|/]+)" kill
-            , matchCommandArity3 "^spawn\\s+([0-9]+)\\s+(\\w+)\\s+\\(\\s*(.*?)\\s*\\)" spawn
+            , matchCommandArity0 "^daemons$" (showDaemons config)
+            , matchCommandArity1 "^kill\\s+([\\w|\\.|/]+)$" (kill config)
+            , matchCommandArity3 "^spawn\\s+(\\w+)\\s+(\\w+)\\s+\\(\\s*(.*?)\\s*\\)$" (spawn config)
             ]
     in
-        input
-            |> String.split "|"
-            |> List.map String.trim
-            |> Maybe.Extra.traverse ((flip traverse2) commands)
-            |> Maybe.map (List.Extra.foldl1 join)
-            |> Maybe.withDefault Nothing
+        traverse2 input commands
+
+
+{-| How to deal with Stream String in a FileSystem a? Probably don't want to
+make that executable. Could add a filter in config.runnable.
+-}
+parseFiles : Config File -> FileSystem File -> String -> Maybe (IOCommand File)
+parseFiles config system input =
+    let
+        isExecutable x =
+            case x of
+                Executable _ command ->
+                    Just command
+
+                Stream _ ->
+                    Nothing
+    in
+        get (String.trim input) system
+            |> Result.toMaybe
+            |> Maybe.andThen isExecutable
 
 
 manString : String
@@ -69,6 +174,7 @@ manString =
   cat [file]     - send file contents to stdout
   write [file]   - write stdin to file, if file doesn't exist
   append [file]  - append stdin to file, if file exists
+  rm [file]      - remove file or directory
   daemons        - show running processes
   spawn [int] [string] (expr)
                  - create a process, e.g.,
@@ -78,22 +184,24 @@ manString =
                    does not use spawn, with the pipe symbol `|` replaced by `!`
   kill [string]  - kill process
   [cmd] | [cmd]  - combine commands by piping stdout to stdin
+  compile [string]
+                 - create an executable with given name from stdin
 """ |> String.Extra.replace " " "\x2002"
 
 
-execute : String -> FileSystem String -> ( String, FileSystem String )
-execute input system =
-    case parse input of
+execute : Config a -> String -> FileSystem a -> ( a, FileSystem a )
+execute config input system =
+    case parse config system input of
         Just command ->
-            case command "" system of
+            case command config.null system of
                 Ok x ->
                     x
 
                 Err s ->
-                    ( "Error: " ++ s, system )
+                    ( "Error: " ++ s |> config.fromString, system )
 
         Nothing ->
-            ( "Error: failed to parse " ++ input, system )
+            ( "Error: failed to parse " ++ input |> config.fromString, system )
 
 
 
@@ -138,16 +246,17 @@ updateDaemon cycles meta ( stream, system, daemons ) =
 
 {-|
 -}
-catDaemon : Name -> String -> Daemon String
-catDaemon name content =
+catDaemon : Config a -> Name -> a -> Daemon a
+catDaemon config name content =
     let
         innerDaemon system =
             let
                 ( stream_, system_ ) =
-                    (append name) content system |> Result.withDefault ( "", system )
+                    (append config name) content system
+                        |> Result.withDefault ( config.null, system )
 
                 daemonSpawn =
-                    catDaemon name content
+                    catDaemon config name content
             in
                 ( stream_, system_, Just daemonSpawn )
     in
@@ -170,6 +279,22 @@ type alias IOCommand a =
     a -> FileSystem a -> Result Error ( a, FileSystem a )
 
 
+type alias Config a =
+    { null : a
+    , fromString : String -> a
+    , toString : a -> String
+    , append : a -> a -> a
+    , -- weird to depend on FileSystem, only need FlatSystem a u
+      compile :
+        String -> FileSystem a -> a -> Result Error a
+    , parsers : Parsers a
+    }
+
+
+type Parsers a
+    = Parsers (List (Config a -> FileSystem a -> String -> Maybe (IOCommand a)))
+
+
 
 -- COMMANDS
 
@@ -177,8 +302,8 @@ type alias IOCommand a =
 {-| Outputs strings. Can be IOCommand a if a function to lift to Stream type
 is provided.
 -}
-ls : Name -> IOCommand String
-ls name _ system =
+ls : Config a -> Name -> IOCommand a
+ls { fromString } name _ system =
     let
         name_ =
             makeAbsolute (name ++ "/") system
@@ -186,12 +311,12 @@ ls name _ system =
         getContents name_ 1 system
             |> Result.map ((List.map (String.dropLeft 1)) >> String.join "\n")
             |> Result.map (\a -> [ "---  " ++ name_ ++ "  ---", a ] |> String.join "\n")
-            |> Result.map (\a -> ( a, system ))
+            |> Result.map (\a -> ( fromString a, system ))
 
 
-lsCwd : IOCommand String
-lsCwd stream system =
-    ls system.cwd stream system
+lsCwd : Config a -> IOCommand a
+lsCwd config stream system =
+    ls config system.cwd stream system
 
 
 cd : Name -> IOCommand a
@@ -214,19 +339,19 @@ cdUp stream system =
     cd (getParent system.cwd) stream system
 
 
-pwd : IOCommand String
-pwd _ system =
-    Result.Ok ( system.cwd, system )
+pwd : Config a -> IOCommand a
+pwd { fromString } _ system =
+    Result.Ok ( fromString system.cwd, system )
 
 
-echo : String -> IOCommand String
-echo x _ system =
-    Result.Ok ( x, system )
+echo : Config a -> String -> IOCommand a
+echo { fromString } x _ system =
+    Result.Ok ( fromString x, system )
 
 
-man : IOCommand String
-man _ system =
-    Result.Ok ( manString, system )
+man : Config a -> IOCommand a
+man { fromString } _ system =
+    Result.Ok ( fromString manString, system )
 
 
 {-| Ignores stdin.
@@ -238,21 +363,42 @@ cat name _ system =
 
 
 {-| Can be IOCommand a if a null stream is provided.
+Inside a pipeline, nice if write and append echo to stdout. At the end of a
+pipeline, not so nice. Could make writeAndContinue with a tee operator.
 -}
-write : Name -> IOCommand String
-write name stream system =
+write : Config a -> Name -> IOCommand a
+write { null } name stream system =
     addFile name stream system
-        |> Result.map (\x -> ( "", x ))
+        |> Result.map (\x -> ( null, x ))
 
 
-append : Name -> IOCommand String
-append name stream system =
+append : Config a -> Name -> IOCommand a
+append { null, append } name stream system =
     get name system
-        |> Result.map (\x -> ( "", unsafeAddFile name (x ++ stream) system ))
+        |> Result.map (\x -> ( null, unsafeAddFile name (append x stream) system ))
 
 
-kill : Name -> IOCommand String
-kill daemonName stream system =
+rm : Config a -> Name -> IOCommand a
+rm { null, append } name stream system =
+    if member (makeAbsolute name system) system then
+        Ok ( null, remove name system )
+    else if member (makeAbsolute (name ++ "/") system) system then
+        Ok ( null, remove (makeAbsolute (name ++ "/") system) system )
+    else
+        Err ("no such file or directory " ++ name)
+
+
+{-| Compiles incoming data. Looks like a generic transformation if strings and
+executables are both in the language.
+-}
+compile : Config a -> String -> IOCommand a
+compile config name stream system =
+    config.compile name system stream
+        |> Result.map (\a -> ( a, system ))
+
+
+kill : Config a -> String -> IOCommand a
+kill { fromString } daemonName stream system =
     let
         target =
             (\{ name } -> name == daemonName)
@@ -262,31 +408,28 @@ kill daemonName stream system =
                 system_ =
                     { system | daemons = List.filter (not << target) system.daemons }
             in
-                Result.Ok ( "killed " ++ daemonName, system_ )
+                Result.Ok ( "killed " ++ daemonName |> fromString, system_ )
         else
             Result.Err ("no daemons around named " ++ daemonName)
 
 
 {-| Parse parenthesized input, handling errors etc.
 -}
-spawn : String -> String -> String -> IOCommand String
-spawn lifetime daemonName input stream system =
+spawn : Config a -> String -> String -> String -> IOCommand a
+spawn config lifetime daemonName input stream system =
     let
         parseResult n =
             input
                 |> String.Extra.replace "!" "|"
-                |> parse
+                |> parse config system
                 |> Result.fromMaybe ("failed to parse command " ++ input)
                 |> Result.map (makeDaemon n)
 
-        stdin =
-            ""
-
-        innerDaemon : IOCommand String -> (FileSystem String -> ( String, FileSystem String, Maybe (Daemon String) ))
+        -- innerDaemon : IOCommand String -> (File System String -> ( String, FileSystem String, Maybe (Daemon String) ))
         innerDaemon command system_ =
             let
                 ( stream_, system__ ) =
-                    command stdin system_ |> Result.withDefault ( "", system_ )
+                    command config.null system_ |> Result.withDefault ( config.null, system_ )
             in
                 ( stream_, system__, Just (Daemon (innerDaemon command)) )
 
@@ -297,16 +440,16 @@ spawn lifetime daemonName input stream system =
             }
 
         registerDaemon daemon =
-            Result.Ok ( stream, { system | daemons = (Debug.log "new d" daemon) :: system.daemons } )
+            Result.Ok ( stream, { system | daemons = daemon :: system.daemons } )
     in
-        String.toInt (Debug.log "l" lifetime)
-            |> Result.mapError (\_ -> "lifetime " ++ lifetime ++ "is not an int")
+        String.toInt lifetime
+            |> Result.mapError (\_ -> lifetime ++ " is not an integer")
             |> Result.andThen parseResult
             |> Result.andThen registerDaemon
 
 
-showDaemons : IOCommand String
-showDaemons stream system =
+showDaemons : Config a -> IOCommand a
+showDaemons { fromString } stream system =
     let
         format { name, lifetime } =
             (toString lifetime) ++ " " ++ name
@@ -326,10 +469,10 @@ showDaemons stream system =
             |> List.map format
             |> String.join "\n"
             |> (++) header
-            |> (\x -> Result.Ok ( x, system ))
+            |> (\x -> Result.Ok ( fromString x, system ))
 
 
-doNothing : IOCommand String
+doNothing : IOCommand a
 doNothing stream system =
     Result.Ok ( stream, system )
 
@@ -351,6 +494,21 @@ matchCommandArity1 pattern command input =
             case submatches of
                 (Just a) :: [] ->
                     Just (command a)
+
+                _ ->
+                    Nothing
+
+        _ ->
+            Nothing
+
+
+matchCommandArity2 : String -> (String -> String -> IOCommand a) -> String -> Maybe (IOCommand a)
+matchCommandArity2 pattern command input =
+    case Regex.find (Regex.AtMost 1) (Regex.regex pattern) input of
+        { submatches } :: _ ->
+            case submatches of
+                (Just a) :: (Just b) :: [] ->
+                    Just (command a b)
 
                 _ ->
                     Nothing
