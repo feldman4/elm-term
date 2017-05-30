@@ -33,17 +33,29 @@ init =
             List.foldl f emptySystem files
 
         daemons =
-            [ { daemon = catDaemon fileConfig "/usr/litter" (Stream "lo"), name = "kitty", lifetime = 100 } ]
+            [-- { daemon = catDaemon fileConfig "/usr/litter" (Stream "lo"), name = "kitty", lifetime = 100 }
+            ]
+
+        prehistory =
+            [ "echo \"echo lo ! append hello ! echo\" | spawn 99 kitty | echo"
+            , "daemons"
+            , "ls"
+            ]
+
+        buffer =
+            "echo cat | compile exe | write say | run hello"
+
+        -- "echo \"echo 4\" | spawn 99 anon"
+        -- "echo \"echo 4\" | compile anon | write exec"
+        -- "echo \"cat exec\" | compile anon | write exe"
+        --"echo hello | write world"
     in
         { history = []
-        , buffer =
-            "echo cat | compile exe | write exe | run hello"
-            -- "echo \"echo 4\" | spawn 99 anon"
-            -- "echo \"echo 4\" | compile anon | write exec"
-            -- "echo \"cat exec\" | compile anon | write exe"
-            --"echo hello | write world"
-        , system = { system | daemons = daemons }
+        , buffer = ""
+        , system = system
         }
+            |> (\m -> List.foldl update m (List.map Execute prehistory))
+            |> (\m -> { m | buffer = buffer })
 
 
 type alias Model =
@@ -81,7 +93,7 @@ update msg model =
             { model | buffer = updateBufferDown key model.buffer (List.map (mapEntry config.toString) model.history) }
 
         Execute buffer ->
-            (executeBuffer model)
+            (executeBuffer { model | buffer = buffer })
 
 
 mapEntry : (a -> b) -> Entry a -> Entry b
@@ -104,19 +116,6 @@ executeBuffer model =
             Output stdout :: Input (config.fromString model.buffer) :: model.history
     in
         { model | history = history, system = system, buffer = "" }
-
-
-
--- VIEW
-
-
-breakText : String -> Html.Html msg
-breakText string =
-    string
-        |> String.split "\n"
-        |> List.map text
-        |> List.intersperse (br [] [])
-        |> (\x -> div [] x)
 
 
 

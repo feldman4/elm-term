@@ -103,6 +103,11 @@ fileConfig =
 -- TOP LEVEL
 
 
+{-|
+- split at |
+- map config.parsers over each command
+- if everything parsed, join into one command by connecting stdin and stdout
+-}
 parse : Config a -> FileSystem a -> String -> Maybe (IOCommand a)
 parse config system input =
     let
@@ -119,12 +124,6 @@ parse config system input =
             |> Maybe.withDefault Nothing
 
 
-{-|
-- split at |
-- simple matcher: String -> Maybe Command
-- register commands as simple matchers
-- including ls => a becomes String
--}
 parseCommands : Config a -> FileSystem a -> String -> Maybe (IOCommand a)
 parseCommands config _ input =
     let
@@ -141,6 +140,7 @@ parseCommands config _ input =
               -- manipulate files
             , matchCommandArity1 "^echo\\s+\\\"(.*)\\\"$" (echo config)
             , matchCommandArity1 "^echo\\s+(.*)$" (echo config)
+            , matchCommandArity0 "^echo$" (echo config "")
             , matchCommandArity0 "^cat$" catStdin
             , matchCommandArity1 "^cat\\s+([\\w|\\.|/]+)$" cat
             , matchCommandArity1 "^write\\s+([\\w|\\.\\*|/]+)$" write
@@ -192,7 +192,8 @@ manString =
   rm [file]      - remove file or directory
   daemons        - show running processes
   spawn [int] [string]
-                 - create a process from an executable or by compiling a string
+                 - create a process from an executable or by compiling a string,
+                   specifying lifetime and name
                      echo "echo blah" | spawn 10 nuisance
                      echo "echo cat ! append hello" | spawn 1 catWriter
                      echo "echo cat" | write exe | cat exe | spawn 1 runOnce
@@ -200,7 +201,7 @@ manString =
   [cmd] | [cmd]  - combine commands by piping stdout to stdin
   compile [string]
                  - create a command with given name from stdin, with the
-                 pipe symbol `|` replaced by `!`
+                   pipe symbol `|` replaced by `!`
   run [file]     - run a command on the contents of a file
                    the following are equivalent if tmp does not exist
                      echo [expr] | compile exe | run file
@@ -234,8 +235,8 @@ type alias DaemonPipe a =
 
 {-| Daemons act on FileSystem sequentially. Weird as they have access to daemon
 list within FileSystem, but any changes to it are discarded at the end of the
-update (can't delete each other). One fix is to Daemon a u with the filesystem
-as a parameter but postponing for now.
+update (can't delete each other). One fix is to move to Daemon a u with the
+filesystem as a parameter but postponing for now.
 -}
 updateDaemons : Int -> FileSystem a -> List (MetaDaemon a) -> DaemonPipe a
 updateDaemons cycles system daemons =
@@ -264,7 +265,8 @@ updateDaemon cycles meta ( stream, system, daemons ) =
                     ( stream_ :: stream, system_, daemons )
 
 
-{-|
+{-| Can construct the corresponding MetaDaemon as
+  echo "echo [content] ! append [name] ! echo" | spawn [lifetime] [name] | echo
 -}
 catDaemon : Config a -> Name -> a -> Daemon a
 catDaemon config name content =
@@ -285,10 +287,6 @@ catDaemon config name content =
 
 
 -- TYPES
-
-
-type alias Stream =
-    String
 
 
 type alias Error =
