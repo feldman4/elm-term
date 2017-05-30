@@ -20861,12 +20861,79 @@ var _user$project$Command$showDaemons = F3(
 					'\n',
 					A2(_elm_lang$core$List$map, format, system.daemons))));
 	});
+var _user$project$Command$spawn = F5(
+	function (config, lifetime, daemonName, stream, system) {
+		var registerDaemon = function (daemon) {
+			return _elm_lang$core$Result$Ok(
+				{
+					ctor: '_Tuple2',
+					_0: stream,
+					_1: _elm_lang$core$Native_Utils.update(
+						system,
+						{
+							daemons: {ctor: '::', _0: daemon, _1: system.daemons}
+						})
+				});
+		};
+		var innerDaemon = F2(
+			function (command, system_) {
+				var _p16 = A2(
+					_elm_lang$core$Result$withDefault,
+					{ctor: '_Tuple2', _0: config.$null, _1: system_},
+					A2(command, config.$null, system_));
+				var stream_ = _p16._0;
+				var system__ = _p16._1;
+				return {
+					ctor: '_Tuple3',
+					_0: stream_,
+					_1: system__,
+					_2: _elm_lang$core$Maybe$Just(
+						_user$project$FileSystem$Daemon(
+							innerDaemon(command)))
+				};
+			});
+		var makeDaemon = F2(
+			function (lifetime_, command) {
+				return {
+					lifetime: lifetime_,
+					name: daemonName,
+					daemon: _user$project$FileSystem$Daemon(
+						innerDaemon(command))
+				};
+			});
+		var parseResult = function (n) {
+			return A2(
+				_elm_lang$core$Result$map,
+				makeDaemon(n),
+				A2(
+					_elm_lang$core$Result$andThen,
+					function (x) {
+						return A2(
+							_elm_lang$core$Result$fromMaybe,
+							'wtf',
+							config.toCommand(x));
+					},
+					A3(config.compile, 'spawned', system, stream)));
+		};
+		return A2(
+			_elm_lang$core$Result$andThen,
+			registerDaemon,
+			A2(
+				_elm_lang$core$Result$andThen,
+				parseResult,
+				A2(
+					_elm_lang$core$Result$mapError,
+					function (_p17) {
+						return A2(_elm_lang$core$Basics_ops['++'], lifetime, ' is not an integer');
+					},
+					_elm_lang$core$String$toInt(lifetime))));
+	});
 var _user$project$Command$kill = F4(
-	function (_p16, daemonName, stream, system) {
-		var _p17 = _p16;
-		var target = function (_p18) {
-			var _p19 = _p18;
-			return _elm_lang$core$Native_Utils.eq(_p19.name, daemonName);
+	function (_p18, daemonName, stream, system) {
+		var _p19 = _p18;
+		var target = function (_p20) {
+			var _p21 = _p20;
+			return _elm_lang$core$Native_Utils.eq(_p21.name, daemonName);
 		};
 		if (A2(_elm_lang$core$List$any, target, system.daemons)) {
 			var system_ = _elm_lang$core$Native_Utils.update(
@@ -20874,15 +20941,15 @@ var _user$project$Command$kill = F4(
 				{
 					daemons: A2(
 						_elm_lang$core$List$filter,
-						function (_p20) {
-							return !target(_p20);
+						function (_p22) {
+							return !target(_p22);
 						},
 						system.daemons)
 				});
 			return _elm_lang$core$Result$Ok(
 				{
 					ctor: '_Tuple2',
-					_0: _p17.fromString(
+					_0: _p19.fromString(
 						A2(_elm_lang$core$Basics_ops['++'], 'killed ', daemonName)),
 					_1: system_
 				});
@@ -20901,16 +20968,16 @@ var _user$project$Command$compile = F4(
 			A3(config.compile, name, system, stream));
 	});
 var _user$project$Command$rm = F4(
-	function (_p21, name, stream, system) {
-		var _p22 = _p21;
-		var _p23 = _p22.$null;
+	function (_p23, name, stream, system) {
+		var _p24 = _p23;
+		var _p25 = _p24.$null;
 		return A2(
 			_user$project$FileSystem$member,
 			A2(_user$project$FileSystem$makeAbsolute, name, system),
 			system) ? _elm_lang$core$Result$Ok(
 			{
 				ctor: '_Tuple2',
-				_0: _p23,
+				_0: _p25,
 				_1: A2(_user$project$FileSystem$remove, name, system)
 			}) : (A2(
 			_user$project$FileSystem$member,
@@ -20921,7 +20988,7 @@ var _user$project$Command$rm = F4(
 			system) ? _elm_lang$core$Result$Ok(
 			{
 				ctor: '_Tuple2',
-				_0: _p23,
+				_0: _p25,
 				_1: A2(
 					_user$project$FileSystem$remove,
 					A2(
@@ -20933,35 +21000,35 @@ var _user$project$Command$rm = F4(
 			A2(_elm_lang$core$Basics_ops['++'], 'no such file or directory ', name)));
 	});
 var _user$project$Command$append = F4(
-	function (_p24, name, stream, system) {
-		var _p25 = _p24;
+	function (_p26, name, stream, system) {
+		var _p27 = _p26;
 		return A2(
 			_elm_lang$core$Result$map,
 			function (x) {
 				return {
 					ctor: '_Tuple2',
-					_0: _p25.$null,
+					_0: _p27.$null,
 					_1: A3(
 						_user$project$FileSystem$unsafeAddFile,
 						name,
-						A2(_p25.append, x, stream),
+						A2(_p27.append, x, stream),
 						system)
 				};
 			},
 			A2(_user$project$FileSystem$get, name, system));
 	});
 var _user$project$Command$write = F4(
-	function (_p26, name, stream, system) {
-		var _p27 = _p26;
+	function (_p28, name, stream, system) {
+		var _p29 = _p28;
 		return A2(
 			_elm_lang$core$Result$map,
 			function (x) {
-				return {ctor: '_Tuple2', _0: _p27.$null, _1: x};
+				return {ctor: '_Tuple2', _0: _p29.$null, _1: x};
 			},
 			A3(_user$project$FileSystem$addFile, name, stream, system));
 	});
 var _user$project$Command$cat = F3(
-	function (name, _p28, system) {
+	function (name, _p30, system) {
 		return A2(
 			_elm_lang$core$Result$map,
 			function (a) {
@@ -20970,22 +21037,22 @@ var _user$project$Command$cat = F3(
 			A2(_user$project$FileSystem$get, name, system));
 	});
 var _user$project$Command$echo = F4(
-	function (_p30, x, _p29, system) {
-		var _p31 = _p30;
+	function (_p32, x, _p31, system) {
+		var _p33 = _p32;
 		return _elm_lang$core$Result$Ok(
 			{
 				ctor: '_Tuple2',
-				_0: _p31.fromString(x),
+				_0: _p33.fromString(x),
 				_1: system
 			});
 	});
 var _user$project$Command$pwd = F3(
-	function (_p33, _p32, system) {
-		var _p34 = _p33;
+	function (_p35, _p34, system) {
+		var _p36 = _p35;
 		return _elm_lang$core$Result$Ok(
 			{
 				ctor: '_Tuple2',
-				_0: _p34.fromString(system.cwd),
+				_0: _p36.fromString(system.cwd),
 				_1: system
 			});
 	});
@@ -21015,8 +21082,8 @@ var _user$project$Command$cdUp = F2(
 			system);
 	});
 var _user$project$Command$ls = F4(
-	function (_p36, name, _p35, system) {
-		var _p37 = _p36;
+	function (_p38, name, _p37, system) {
+		var _p39 = _p38;
 		var name_ = A2(
 			_user$project$FileSystem$makeAbsolute,
 			A2(_elm_lang$core$Basics_ops['++'], name, '/'),
@@ -21026,7 +21093,7 @@ var _user$project$Command$ls = F4(
 			function (a) {
 				return {
 					ctor: '_Tuple2',
-					_0: _p37.fromString(a),
+					_0: _p39.fromString(a),
 					_1: system
 				};
 			},
@@ -21051,14 +21118,14 @@ var _user$project$Command$ls = F4(
 				},
 				A2(
 					_elm_lang$core$Result$map,
-					function (_p38) {
+					function (_p40) {
 						return A2(
 							_elm_lang$core$String$join,
 							'\n',
 							A2(
 								_elm_lang$core$List$map,
 								_elm_lang$core$String$dropLeft(1),
-								_p38));
+								_p40));
 					},
 					A3(_user$project$FileSystem$getContents, name_, 1, system))));
 	});
@@ -21070,12 +21137,12 @@ var _user$project$Command$catDaemon = F3(
 	function (config, name, content) {
 		var innerDaemon = function (system) {
 			var daemonSpawn = A3(_user$project$Command$catDaemon, config, name, content);
-			var _p39 = A2(
+			var _p41 = A2(
 				_elm_lang$core$Result$withDefault,
 				{ctor: '_Tuple2', _0: config.$null, _1: system},
 				A4(_user$project$Command$append, config, name, content, system));
-			var stream_ = _p39._0;
-			var system_ = _p39._1;
+			var stream_ = _p41._0;
+			var system_ = _p41._1;
 			return {
 				ctor: '_Tuple3',
 				_0: stream_,
@@ -21086,45 +21153,45 @@ var _user$project$Command$catDaemon = F3(
 		return _user$project$FileSystem$Daemon(innerDaemon);
 	});
 var _user$project$Command$updateDaemon = F3(
-	function (cycles, meta, _p40) {
-		var _p41 = _p40;
-		var _p47 = _p41._1;
-		var _p46 = _p41._0;
-		var _p45 = _p41._2;
+	function (cycles, meta, _p42) {
+		var _p43 = _p42;
+		var _p49 = _p43._1;
+		var _p48 = _p43._0;
+		var _p47 = _p43._2;
 		if (_elm_lang$core$Native_Utils.eq(meta.lifetime, 0)) {
-			return {ctor: '_Tuple3', _0: _p46, _1: _p47, _2: _p45};
+			return {ctor: '_Tuple3', _0: _p48, _1: _p49, _2: _p47};
 		} else {
-			var unpack = function (_p42) {
-				var _p43 = _p42;
-				return _p43._0;
+			var unpack = function (_p44) {
+				var _p45 = _p44;
+				return _p45._0;
 			};
-			var _p44 = A2(unpack, meta.daemon, _p47);
-			if (_p44._2.ctor === 'Just') {
+			var _p46 = A2(unpack, meta.daemon, _p49);
+			if (_p46._2.ctor === 'Just') {
 				return {
 					ctor: '_Tuple3',
-					_0: {ctor: '::', _0: _p44._0, _1: _p46},
-					_1: _p44._1,
+					_0: {ctor: '::', _0: _p46._0, _1: _p48},
+					_1: _p46._1,
 					_2: {
 						ctor: '::',
 						_0: _elm_lang$core$Native_Utils.update(
 							meta,
-							{daemon: _p44._2._0, lifetime: meta.lifetime - cycles}),
-						_1: _p45
+							{daemon: _p46._2._0, lifetime: meta.lifetime - cycles}),
+						_1: _p47
 					}
 				};
 			} else {
 				return {
 					ctor: '_Tuple3',
-					_0: {ctor: '::', _0: _p44._0, _1: _p46},
-					_1: _p44._1,
-					_2: _p45
+					_0: {ctor: '::', _0: _p46._0, _1: _p48},
+					_1: _p46._1,
+					_2: _p47
 				};
 			}
 		}
 	});
 var _user$project$Command$updateDaemons = F3(
 	function (cycles, system, daemons) {
-		var _p48 = A3(
+		var _p50 = A3(
 			_elm_lang$core$List$foldl,
 			_user$project$Command$updateDaemon(cycles),
 			{
@@ -21134,9 +21201,9 @@ var _user$project$Command$updateDaemons = F3(
 				_2: {ctor: '[]'}
 			},
 			daemons);
-		var streams = _p48._0;
-		var system_ = _p48._1;
-		var daemons_ = _p48._2;
+		var streams = _p50._0;
+		var system_ = _p50._1;
+		var daemons_ = _p50._2;
 		return {
 			ctor: '_Tuple3',
 			_0: streams,
@@ -21148,23 +21215,23 @@ var _user$project$Command$updateDaemons = F3(
 			_2: {ctor: '[]'}
 		};
 	});
-var _user$project$Command$manString = A3(_elm_community$string_extra$String_Extra$replace, ' ', ' ', '\n  help           - print help to stdout\n  l              - show directory contents\n  ls             - show directory contents\n  pwd            - print working directory\n  cd [directory] - change directory\n  echo [string]  - send text to stdout\n  cat [file]     - send file contents to stdout\n  write [file]   - write stdin to file, if file doesn\'t exist\n  append [file]  - append stdin to file, if file exists\n  rm [file]      - remove file or directory\n  daemons        - show running processes\n  spawn [int] [string] (expr)\n                 - create a process, e.g.,\n                     (spawn 10 nuisance (echo blah))\n                     (spawn 1 catWriter (echo cat ! append hello))\n                   the parentheses can contain any valid expression that\n                   does not use spawn, with the pipe symbol `|` replaced by `!`\n  kill [string]  - kill process\n  [cmd] | [cmd]  - combine commands by piping stdout to stdin\n  compile [string] (expr)\n                 - create an executable with given name and send to stdout\n');
+var _user$project$Command$manString = A3(_elm_community$string_extra$String_Extra$replace, ' ', ' ', '\n  help           - print help to stdout\n  l              - show directory contents\n  ls             - show directory contents\n  pwd            - print working directory\n  cd [directory] - change directory\n  echo [string]  - send text to stdout\n  cat [file]     - send file contents to stdout\n  write [file]   - write stdin to file, if file doesn\'t exist\n  append [file]  - append stdin to file, if file exists\n  rm [file]      - remove file or directory\n  daemons        - show running processes\n  spawn [int] [string] (expr)\n                 - create a process, e.g.,\n                     (spawn 10 nuisance (echo blah))\n                     (spawn 1 catWriter (echo cat ! append hello))\n                   the parentheses can contain any valid expression that\n                   does not use spawn, with the pipe symbol `|` replaced by `!`\n  kill [string]  - kill process\n  [cmd] | [cmd]  - combine commands by piping stdout to stdin\n  compile [string]\n                 - create an executable with given name from stdin\n');
 var _user$project$Command$man = F3(
-	function (_p50, _p49, system) {
-		var _p51 = _p50;
+	function (_p52, _p51, system) {
+		var _p53 = _p52;
 		return _elm_lang$core$Result$Ok(
 			{
 				ctor: '_Tuple2',
-				_0: _p51.fromString(_user$project$Command$manString),
+				_0: _p53.fromString(_user$project$Command$manString),
 				_1: system
 			});
 	});
 var _user$project$Command$parseFiles = F3(
 	function (config, system, input) {
 		var isExecutable = function (x) {
-			var _p52 = x;
-			if (_p52.ctor === 'Executable') {
-				return _elm_lang$core$Maybe$Just(_p52._1);
+			var _p54 = x;
+			if (_p54.ctor === 'Executable') {
+				return _elm_lang$core$Maybe$Just(_p54._1);
 			} else {
 				return _elm_lang$core$Maybe$Nothing;
 			}
@@ -21178,123 +21245,8 @@ var _user$project$Command$parseFiles = F3(
 					_elm_lang$core$String$trim(input),
 					system)));
 	});
-var _user$project$Command$parse = F3(
-	function (config, system, input) {
-		var parsers = A2(
-			_elm_lang$core$List$map,
-			function (x) {
-				return A2(x, config, system);
-			},
-			function (_p53) {
-				var _p54 = _p53;
-				return _p54._0;
-			}(config.parsers));
-		return A2(
-			_elm_lang$core$Maybe$withDefault,
-			_elm_lang$core$Maybe$Nothing,
-			A2(
-				_elm_lang$core$Maybe$map,
-				_elm_community$list_extra$List_Extra$foldl1(_user$project$Command$join),
-				A2(
-					_elm_community$maybe_extra$Maybe_Extra$traverse,
-					A2(_elm_lang$core$Basics$flip, _user$project$Command$traverse2, parsers),
-					A2(
-						_elm_lang$core$List$map,
-						_elm_lang$core$String$trim,
-						A2(_elm_lang$core$String$split, '|', input)))));
-	});
-var _user$project$Command$execute = F3(
-	function (config, input, system) {
-		var _p55 = A3(_user$project$Command$parse, config, system, input);
-		if (_p55.ctor === 'Just') {
-			var _p56 = A2(_p55._0, config.$null, system);
-			if (_p56.ctor === 'Ok') {
-				return _p56._0;
-			} else {
-				return {
-					ctor: '_Tuple2',
-					_0: config.fromString(
-						A2(_elm_lang$core$Basics_ops['++'], 'Error: ', _p56._0)),
-					_1: system
-				};
-			}
-		} else {
-			return {
-				ctor: '_Tuple2',
-				_0: config.fromString(
-					A2(_elm_lang$core$Basics_ops['++'], 'Error: failed to parse ', input)),
-				_1: system
-			};
-		}
-	});
-var _user$project$Command$spawn = F6(
-	function (config, lifetime, daemonName, input, stream, system) {
-		var registerDaemon = function (daemon) {
-			return _elm_lang$core$Result$Ok(
-				{
-					ctor: '_Tuple2',
-					_0: stream,
-					_1: _elm_lang$core$Native_Utils.update(
-						system,
-						{
-							daemons: {ctor: '::', _0: daemon, _1: system.daemons}
-						})
-				});
-		};
-		var innerDaemon = F2(
-			function (command, system_) {
-				var _p57 = A2(
-					_elm_lang$core$Result$withDefault,
-					{ctor: '_Tuple2', _0: config.$null, _1: system_},
-					A2(command, config.$null, system_));
-				var stream_ = _p57._0;
-				var system__ = _p57._1;
-				return {
-					ctor: '_Tuple3',
-					_0: stream_,
-					_1: system__,
-					_2: _elm_lang$core$Maybe$Just(
-						_user$project$FileSystem$Daemon(
-							innerDaemon(command)))
-				};
-			});
-		var makeDaemon = F2(
-			function (lifetime_, command) {
-				return {
-					lifetime: lifetime_,
-					name: daemonName,
-					daemon: _user$project$FileSystem$Daemon(
-						innerDaemon(command))
-				};
-			});
-		var parseResult = function (n) {
-			return A2(
-				_elm_lang$core$Result$map,
-				makeDaemon(n),
-				A2(
-					_elm_lang$core$Result$fromMaybe,
-					A2(_elm_lang$core$Basics_ops['++'], 'failed to parse command ', input),
-					A3(
-						_user$project$Command$parse,
-						config,
-						system,
-						A3(_elm_community$string_extra$String_Extra$replace, '!', '|', input))));
-		};
-		return A2(
-			_elm_lang$core$Result$andThen,
-			registerDaemon,
-			A2(
-				_elm_lang$core$Result$andThen,
-				parseResult,
-				A2(
-					_elm_lang$core$Result$mapError,
-					function (_p58) {
-						return A2(_elm_lang$core$Basics_ops['++'], lifetime, ' is not an integer');
-					},
-					_elm_lang$core$String$toInt(lifetime))));
-	});
 var _user$project$Command$parseCommands = F3(
-	function (config, _p59, input) {
+	function (config, _p55, input) {
 		var commands = {
 			ctor: '::',
 			_0: A2(_user$project$Command$matchCommandArity0, '^$', _user$project$Command$doNothing),
@@ -21388,8 +21340,8 @@ var _user$project$Command$parseCommands = F3(
 																			_1: {
 																				ctor: '::',
 																				_0: A2(
-																					_user$project$Command$matchCommandArity3,
-																					'^spawn\\s+(\\w+)\\s+(\\w+)\\s+\\(\\s*(.*?)\\s*\\)$',
+																					_user$project$Command$matchCommandArity2,
+																					'^spawn\\s+(\\w+)\\s+(\\w+)$',
 																					_user$project$Command$spawn(config)),
 																				_1: {ctor: '[]'}
 																			}
@@ -21412,11 +21364,60 @@ var _user$project$Command$parseCommands = F3(
 		};
 		return A2(_user$project$Command$traverse2, input, commands);
 	});
+var _user$project$Command$parse = F3(
+	function (config, system, input) {
+		var parsers = A2(
+			_elm_lang$core$List$map,
+			function (x) {
+				return A2(x, config, system);
+			},
+			function (_p56) {
+				var _p57 = _p56;
+				return _p57._0;
+			}(config.parsers));
+		return A2(
+			_elm_lang$core$Maybe$withDefault,
+			_elm_lang$core$Maybe$Nothing,
+			A2(
+				_elm_lang$core$Maybe$map,
+				_elm_community$list_extra$List_Extra$foldl1(_user$project$Command$join),
+				A2(
+					_elm_community$maybe_extra$Maybe_Extra$traverse,
+					A2(_elm_lang$core$Basics$flip, _user$project$Command$traverse2, parsers),
+					A2(
+						_elm_lang$core$List$map,
+						_elm_lang$core$String$trim,
+						A2(_elm_lang$core$String$split, '|', input)))));
+	});
+var _user$project$Command$execute = F3(
+	function (config, input, system) {
+		var _p58 = A3(_user$project$Command$parse, config, system, input);
+		if (_p58.ctor === 'Just') {
+			var _p59 = A2(_p58._0, config.$null, system);
+			if (_p59.ctor === 'Ok') {
+				return _p59._0;
+			} else {
+				return {
+					ctor: '_Tuple2',
+					_0: config.fromString(
+						A2(_elm_lang$core$Basics_ops['++'], 'Error: ', _p59._0)),
+					_1: system
+				};
+			}
+		} else {
+			return {
+				ctor: '_Tuple2',
+				_0: config.fromString(
+					A2(_elm_lang$core$Basics_ops['++'], 'Error: failed to parse ', input)),
+				_1: system
+			};
+		}
+	});
 var _user$project$Command$main = _elm_lang$virtual_dom$Native_VirtualDom.staticProgram(
 	_elm_lang$html$Html$text(''));
-var _user$project$Command$Config = F6(
-	function (a, b, c, d, e, f) {
-		return {$null: a, fromString: b, toString: c, append: d, compile: e, parsers: f};
+var _user$project$Command$Config = F7(
+	function (a, b, c, d, e, f, g) {
+		return {$null: a, fromString: b, toString: c, toCommand: d, append: e, compile: f, parsers: g};
 	});
 var _user$project$Command$Executable = F2(
 	function (a, b) {
@@ -21440,6 +21441,9 @@ var _user$project$Command$stringConfig = {
 			return A2(_elm_lang$core$Basics_ops['++'], x, y);
 		}),
 	toString: _elm_lang$core$Basics$identity,
+	toCommand: function (_p60) {
+		return _elm_lang$core$Maybe$Nothing;
+	},
 	parsers: _user$project$Command$Parsers(
 		{
 			ctor: '::',
@@ -21447,57 +21451,52 @@ var _user$project$Command$stringConfig = {
 			_1: {ctor: '[]'}
 		})
 };
-var _user$project$Command$blah = _user$project$Command$Parsers(
-	{
-		ctor: '::',
-		_0: _user$project$Command$parseCommands,
-		_1: {ctor: '[]'}
-	});
 var _user$project$Command$fileConfig = function () {
 	var append = F2(
 		function (x, y) {
-			var _p60 = {ctor: '_Tuple2', _0: x, _1: y};
-			if (_p60._0.ctor === 'Stream') {
-				if (_p60._1.ctor === 'Stream') {
+			var _p61 = {ctor: '_Tuple2', _0: x, _1: y};
+			if (_p61._0.ctor === 'Stream') {
+				if (_p61._1.ctor === 'Stream') {
 					return _user$project$Command$Stream(
-						A2(_elm_lang$core$Basics_ops['++'], _p60._0._0, _p60._1._0));
+						A2(_elm_lang$core$Basics_ops['++'], _p61._0._0, _p61._1._0));
 				} else {
-					var _p61 = _p60._0._0;
+					var _p62 = _p61._0._0;
 					return A2(
 						_user$project$Command$Executable,
 						A2(
 							_elm_lang$core$Basics_ops['++'],
-							_p60._1._0,
+							_p61._1._0,
 							A2(
 								_elm_lang$core$Basics_ops['++'],
 								'(',
-								A2(_elm_lang$core$Basics_ops['++'], _p61, ')'))),
+								A2(_elm_lang$core$Basics_ops['++'], _p62, ')'))),
 						A2(
 							_user$project$Command$join,
-							A2(_user$project$Command$echo, _user$project$Command$fileConfig, _p61),
-							_p60._1._1));
+							A2(_user$project$Command$echo, _user$project$Command$fileConfig, _p62),
+							_p61._1._1));
 				}
 			} else {
-				if (_p60._1.ctor === 'Executable') {
+				if (_p61._1.ctor === 'Executable') {
 					return A2(
 						_user$project$Command$Executable,
 						A2(
 							_elm_lang$core$Basics_ops['++'],
-							_p60._0._0,
-							A2(_elm_lang$core$Basics_ops['++'], ':', _p60._1._0)),
-						A2(_user$project$Command$join, _p60._0._1, _p60._1._1));
+							_p61._0._0,
+							A2(_elm_lang$core$Basics_ops['++'], ':', _p61._1._0)),
+						A2(_user$project$Command$join, _p61._0._1, _p61._1._1));
 				} else {
-					return _user$project$Command$Stream(_p60._1._0);
+					return _user$project$Command$Stream(_p61._1._0);
 				}
 			}
 		});
 	var compile = F3(
 		function (name, system, input) {
-			var _p62 = input;
-			if (_p62.ctor === 'Executable') {
-				return _elm_lang$core$Result$Ok(input);
+			var _p63 = input;
+			if (_p63.ctor === 'Executable') {
+				return _elm_lang$core$Result$Ok(
+					A2(_user$project$Command$Executable, name, _p63._1));
 			} else {
-				var _p65 = _p62._0;
+				var _p66 = _p63._0;
 				return A2(
 					_elm_lang$core$Result$map,
 					function (x) {
@@ -21505,26 +21504,34 @@ var _user$project$Command$fileConfig = function () {
 					},
 					A2(
 						_elm_lang$core$Result$fromMaybe,
-						A2(_elm_lang$core$Basics_ops['++'], 'failed to parse ', _p65),
+						A2(_elm_lang$core$Basics_ops['++'], 'failed to parse ', _p66),
 						A2(
 							_elm_community$maybe_extra$Maybe_Extra$orElseLazy,
-							function (_p63) {
-								var _p64 = _p63;
-								return A3(_user$project$Command$parseFiles, _user$project$Command$fileConfig, system, _p65);
+							function (_p64) {
+								var _p65 = _p64;
+								return A3(_user$project$Command$parseFiles, _user$project$Command$fileConfig, system, _p66);
 							},
 							A3(
 								_user$project$Command$parse,
 								_user$project$Command$fileConfig,
 								system,
-								A3(_elm_community$string_extra$String_Extra$replace, '!', '|', _p65)))));
+								A3(_elm_community$string_extra$String_Extra$replace, '!', '|', _p66)))));
 			}
 		});
-	var toString = function (x) {
-		var _p66 = x;
-		if (_p66.ctor === 'Stream') {
-			return _p66._0;
+	var toCommand = function (x) {
+		var _p67 = x;
+		if (_p67.ctor === 'Executable') {
+			return _elm_lang$core$Maybe$Just(_p67._1);
 		} else {
-			return A2(_elm_lang$core$Basics_ops['++'], 'Executable: ', _p66._0);
+			return _elm_lang$core$Maybe$Nothing;
+		}
+	};
+	var toString = function (x) {
+		var _p68 = x;
+		if (_p68.ctor === 'Stream') {
+			return _p68._0;
+		} else {
+			return A2(_elm_lang$core$Basics_ops['++'], 'Executable: ', _p68._0);
 		}
 	};
 	return {
@@ -21532,6 +21539,7 @@ var _user$project$Command$fileConfig = function () {
 		fromString: _user$project$Command$Stream,
 		append: append,
 		toString: toString,
+		toCommand: toCommand,
 		compile: compile,
 		parsers: _user$project$Command$Parsers(
 			{

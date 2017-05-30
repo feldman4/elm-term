@@ -37,8 +37,9 @@ init =
     in
         { history = []
         , buffer =
-            "echo \"echo 4\" | compile anon | write exec"
-            -- "spawn 9 dog ( echo hel ! append hello )"
+            -- "echo \"echo 4\" | spawn 99 anon"
+            -- "echo \"echo 4\" | compile anon | write exec"
+            "echo \"cat exec\" | compile anon | write exe"
             --"echo hello | write world"
         , system = { system | daemons = daemons }
         }

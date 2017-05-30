@@ -26,6 +26,7 @@ stringConfig =
     , compile = (\name system a -> Err "Not implemented")
     , append = (++)
     , toString = identity
+    , toCommand = (\_ -> Nothing)
     , parsers = Parsers [ parseCommands ]
     }
 
@@ -49,6 +50,14 @@ fileConfig =
 
                 Executable name _ ->
                     "Executable: " ++ name
+
+        toCommand x =
+            case x of
+                Executable _ command ->
+                    Just command
+
+                Stream _ ->
+                    Nothing
 
         compile name system input =
             case input of
@@ -81,6 +90,7 @@ fileConfig =
         , fromString = Stream
         , append = append
         , toString = toString
+        , toCommand = toCommand
         , compile = compile
         , parsers = Parsers [ parseCommands, parseFiles ]
         }
@@ -137,7 +147,7 @@ parseCommands config _ input =
               -- daemons
             , matchCommandArity0 "^daemons$" (showDaemons config)
             , matchCommandArity1 "^kill\\s+([\\w|\\.|/]+)$" (kill config)
-            , matchCommandArity3 "^spawn\\s+(\\w+)\\s+(\\w+)\\s+\\(\\s*(.*?)\\s*\\)$" (spawn config)
+            , matchCommandArity2 "^spawn\\s+(\\w+)\\s+(\\w+)$" (spawn config)
             ]
     in
         traverse2 input commands
@@ -176,16 +186,21 @@ manString =
   append [file]  - append stdin to file, if file exists
   rm [file]      - remove file or directory
   daemons        - show running processes
-  spawn [int] [string] (expr)
-                 - create a process, e.g.,
-                     (spawn 10 nuisance (echo blah))
-                     (spawn 1 catWriter (echo cat ! append hello))
-                   the parentheses can contain any valid expression that
-                   does not use spawn, with the pipe symbol `|` replaced by `!`
+  spawn [int] [string]
+                 - create a process from an executable or by compiling a string
+                     echo "echo blah" | spawn 10 nuisance
+                     echo "echo cat ! append hello" | spawn 1 catWriter
+                     echo "echo cat" | write exe | cat exe | spawn 1 runOnce
   kill [string]  - kill process
   [cmd] | [cmd]  - combine commands by piping stdout to stdin
   compile [string]
-                 - create an executable with given name from stdin
+                 - create a command with given name from stdin, with the
+                 pipe symbol `|` replaced by `!`
+  run [file]     - run a command on the contents of a file
+                   the following are equivalent if tmp does not exist
+                     echo [expr] | compile exe | run file
+                     echo [expr] | compile exe | write tmp | cat file | tmp | rm tmp
+
 """ |> String.Extra.replace " " "\x2002"
 
 
@@ -283,6 +298,7 @@ type alias Config a =
     { null : a
     , fromString : String -> a
     , toString : a -> String
+    , toCommand : a -> Maybe (IOCommand a)
     , append : a -> a -> a
     , -- weird to depend on FileSystem, only need FlatSystem a u
       compile :
@@ -381,9 +397,9 @@ append { null, append } name stream system =
 rm : Config a -> Name -> IOCommand a
 rm { null, append } name stream system =
     if member (makeAbsolute name system) system then
-        Ok ( null, remove name system )
+        Ok ( stream, remove name system )
     else if member (makeAbsolute (name ++ "/") system) system then
-        Ok ( null, remove (makeAbsolute (name ++ "/") system) system )
+        Ok ( stream, remove (makeAbsolute (name ++ "/") system) system )
     else
         Err ("no such file or directory " ++ name)
 
@@ -415,17 +431,14 @@ kill { fromString } daemonName stream system =
 
 {-| Parse parenthesized input, handling errors etc.
 -}
-spawn : Config a -> String -> String -> String -> IOCommand a
-spawn config lifetime daemonName input stream system =
+spawn : Config a -> String -> String -> IOCommand a
+spawn config lifetime daemonName stream system =
     let
         parseResult n =
-            input
-                |> String.Extra.replace "!" "|"
-                |> parse config system
-                |> Result.fromMaybe ("failed to parse command " ++ input)
+            config.compile "spawned" system stream
+                |> Result.andThen (\x -> x |> config.toCommand |> Result.fromMaybe "wtf")
                 |> Result.map (makeDaemon n)
 
-        -- innerDaemon : IOCommand String -> (File System String -> ( String, FileSystem String, Maybe (Daemon String) ))
         innerDaemon command system_ =
             let
                 ( stream_, system__ ) =
