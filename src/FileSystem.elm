@@ -170,10 +170,10 @@ safeInsert name x system =
                 Ok { system | storage = Dict.insert name x system.storage }
 
             ( False, _ ) ->
-                Err ((getParent name) ++ " : No such directory")
+                Err ("no such directory " ++ (getParent name))
 
             ( True, True ) ->
-                Err (name ++ " : File exists")
+                Err ("file exists " ++ name)
 
 
 {-| Insert with parent directories, overriding existing.
@@ -220,7 +220,7 @@ getContents name depth system =
                 |> List.filter ((/=) name_)
                 |> Ok
         else
-            Err "No such directory"
+            Err "no such directory"
 
 
 get : Name -> FlatSystem a u -> Result Error a
@@ -230,10 +230,10 @@ get name system =
             Ok x
 
         Nothing ->
-            Err ("No such file " ++ name)
+            Err ("no such file " ++ name)
 
         Just Nothing ->
-            Err "Is a directory"
+            Err "is a directory"
 
 
 remove : Name -> FlatSystem a u -> FlatSystem a u

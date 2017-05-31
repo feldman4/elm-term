@@ -22,14 +22,22 @@ main =
 
 stringConfig : Config String
 stringConfig =
-    { null = ""
-    , fromString = identity
-    , compile = (\name system a -> Err "Not implemented")
-    , append = (++)
-    , toString = identity
-    , toCommand = (\_ -> Nothing)
-    , parsers = Parsers [ parseCommands ]
-    }
+    let
+        compile system input =
+            input
+                |> String.Extra.replace "!" "|"
+                |> parse stringConfig system
+                |> Result.fromMaybe ("failed to parse " ++ input)
+    in
+        { null = ""
+        , fromString = identity
+        , compile = compile
+        , append = (++)
+        , toString = identity
+        , toCommand = (\_ -> Nothing)
+        , fromCommand = (\_ _ -> Err "can't represent commands")
+        , parsers = Parsers [ parseCommands ]
+        }
 
 
 
@@ -60,10 +68,10 @@ fileConfig =
                 Stream _ ->
                     Nothing
 
-        compile name system input =
+        compile system input =
             case input of
                 Executable _ command ->
-                    Ok (Executable name command)
+                    Ok command
 
                 Stream expr ->
                     expr
@@ -71,7 +79,6 @@ fileConfig =
                         |> parse fileConfig system
                         |> Maybe.Extra.orElseLazy (\() -> parseFiles fileConfig system expr)
                         |> Result.fromMaybe ("failed to parse " ++ expr)
-                        |> Result.map (\x -> Executable name x)
 
         append x y =
             case ( x, y ) of
@@ -94,6 +101,7 @@ fileConfig =
         , append = append
         , toString = toString
         , toCommand = toCommand
+        , fromCommand = (\name a -> Ok (Executable name a))
         , compile = compile
         , parsers = Parsers [ parseCommands, parseFiles ]
         }
@@ -301,11 +309,12 @@ type alias Config a =
     { null : a
     , fromString : String -> a
     , toString : a -> String
+    , fromCommand : String -> IOCommand a -> Result Error a
     , toCommand : a -> Maybe (IOCommand a)
     , append : a -> a -> a
     , -- weird to depend on FileSystem, only need FlatSystem a u
       compile :
-        String -> FileSystem a -> a -> Result Error a
+        FileSystem a -> a -> Result Error (IOCommand a)
     , parsers : Parsers a
     }
 
@@ -420,7 +429,8 @@ executables are both in the language.
 -}
 compile : Config a -> String -> IOCommand a
 compile config name stream system =
-    config.compile name system stream
+    config.compile system stream
+        |> Result.andThen (config.fromCommand name)
         |> Result.map (\a -> ( a, system ))
 
 
@@ -454,8 +464,7 @@ spawn : Config a -> String -> String -> IOCommand a
 spawn config lifetime daemonName stream system =
     let
         parseResult n =
-            config.compile "spawned" system stream
-                |> Result.andThen (\x -> x |> config.toCommand |> Result.fromMaybe "wtf")
+            config.compile system stream
                 |> Result.map (makeDaemon n)
 
         innerDaemon command system_ =

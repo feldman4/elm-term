@@ -13,6 +13,10 @@ config =
     fileConfig
 
 
+type alias Model =
+    Terminal File
+
+
 main : Program Never Model Msg
 main =
     Html.program
@@ -27,7 +31,7 @@ init : Model
 init =
     let
         f name =
-            unsafeAddFile name (String.toUpper name |> Stream)
+            unsafeAddFile name (String.toUpper name |> config.fromString)
 
         system =
             List.foldl f emptySystem files
@@ -56,10 +60,6 @@ init =
         }
             |> (\m -> List.foldl update m (List.map Execute prehistory))
             |> (\m -> { m | buffer = buffer })
-
-
-type alias Model =
-    Terminal File
 
 
 
