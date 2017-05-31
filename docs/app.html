@@ -20663,8 +20663,8 @@ var _user$project$FileSystem$safeInsert = F3(
 			return _elm_lang$core$Result$Err(
 				A2(
 					_elm_lang$core$Basics_ops['++'],
-					_user$project$FileSystem$getParent(name),
-					' : No such directory'));
+					'no such directory ',
+					_user$project$FileSystem$getParent(name)));
 		} else {
 			if (_p7._1 === false) {
 				return _elm_lang$core$Result$Ok(
@@ -20675,7 +20675,7 @@ var _user$project$FileSystem$safeInsert = F3(
 						}));
 			} else {
 				return _elm_lang$core$Result$Err(
-					A2(_elm_lang$core$Basics_ops['++'], name, ' : File exists'));
+					A2(_elm_lang$core$Basics_ops['++'], 'file exists ', name));
 			}
 		}
 	});
@@ -20743,7 +20743,7 @@ var _user$project$FileSystem$getContents = F3(
 					A2(
 						_elm_lang$core$List$filter,
 						_elm_lang$core$String$contains(name_),
-						_elm_lang$core$Dict$keys(system.storage))))) : _elm_lang$core$Result$Err('No such directory');
+						_elm_lang$core$Dict$keys(system.storage))))) : _elm_lang$core$Result$Err('no such directory');
 	});
 var _user$project$FileSystem$get = F2(
 	function (name, system) {
@@ -20756,12 +20756,12 @@ var _user$project$FileSystem$get = F2(
 			system.storage);
 		if (_p11.ctor === 'Nothing') {
 			return _elm_lang$core$Result$Err(
-				A2(_elm_lang$core$Basics_ops['++'], 'No such file ', name));
+				A2(_elm_lang$core$Basics_ops['++'], 'no such file ', name));
 		} else {
 			if (_p11._0.ctor === 'Just') {
 				return _elm_lang$core$Result$Ok(_p11._0._0);
 			} else {
-				return _elm_lang$core$Result$Err('Is a directory');
+				return _elm_lang$core$Result$Err('is a directory');
 			}
 		}
 	});
@@ -21028,15 +21028,7 @@ var _user$project$Command$spawn = F5(
 			return A2(
 				_elm_lang$core$Result$map,
 				makeDaemon(n),
-				A2(
-					_elm_lang$core$Result$andThen,
-					function (x) {
-						return A2(
-							_elm_lang$core$Result$fromMaybe,
-							'wtf',
-							config.toCommand(x));
-					},
-					A3(config.compile, 'spawned', system, stream)));
+				A2(config.compile, system, stream));
 		};
 		return A2(
 			_elm_lang$core$Result$andThen,
@@ -21108,7 +21100,10 @@ var _user$project$Command$compile = F4(
 			function (a) {
 				return {ctor: '_Tuple2', _0: a, _1: system};
 			},
-			A3(config.compile, name, system, stream));
+			A2(
+				_elm_lang$core$Result$andThen,
+				config.fromCommand(name),
+				A2(config.compile, system, stream)));
 	});
 var _user$project$Command$rm = F4(
 	function (_p23, name, stream, system) {
@@ -21576,9 +21571,9 @@ var _user$project$Command$execute = F3(
 	});
 var _user$project$Command$main = _elm_lang$virtual_dom$Native_VirtualDom.staticProgram(
 	_elm_lang$html$Html$text(''));
-var _user$project$Command$Config = F7(
-	function (a, b, c, d, e, f, g) {
-		return {$null: a, fromString: b, toString: c, toCommand: d, append: e, compile: f, parsers: g};
+var _user$project$Command$Config = F8(
+	function (a, b, c, d, e, f, g, h) {
+		return {$null: a, fromString: b, toString: c, fromCommand: d, toCommand: e, append: f, compile: g, parsers: h};
 	});
 var _user$project$Command$Executable = F2(
 	function (a, b) {
@@ -21590,109 +21585,117 @@ var _user$project$Command$Stream = function (a) {
 var _user$project$Command$Parsers = function (a) {
 	return {ctor: 'Parsers', _0: a};
 };
-var _user$project$Command$stringConfig = {
-	$null: '',
-	fromString: _elm_lang$core$Basics$identity,
-	compile: F3(
-		function (name, system, a) {
-			return _elm_lang$core$Result$Err('Not implemented');
-		}),
-	append: F2(
-		function (x, y) {
-			return A2(_elm_lang$core$Basics_ops['++'], x, y);
-		}),
-	toString: _elm_lang$core$Basics$identity,
-	toCommand: function (_p57) {
-		return _elm_lang$core$Maybe$Nothing;
-	},
-	parsers: _user$project$Command$Parsers(
-		{
-			ctor: '::',
-			_0: _user$project$Command$parseCommands,
-			_1: {ctor: '[]'}
-		})
-};
+var _user$project$Command$stringConfig = function () {
+	var compile = F2(
+		function (system, input) {
+			return A2(
+				_elm_lang$core$Result$fromMaybe,
+				A2(_elm_lang$core$Basics_ops['++'], 'failed to parse ', input),
+				A3(
+					_user$project$Command$parse,
+					_user$project$Command$stringConfig,
+					system,
+					A3(_elm_community$string_extra$String_Extra$replace, '!', '|', input)));
+		});
+	return {
+		$null: '',
+		fromString: _elm_lang$core$Basics$identity,
+		compile: compile,
+		append: F2(
+			function (x, y) {
+				return A2(_elm_lang$core$Basics_ops['++'], x, y);
+			}),
+		toString: _elm_lang$core$Basics$identity,
+		toCommand: function (_p57) {
+			return _elm_lang$core$Maybe$Nothing;
+		},
+		fromCommand: F2(
+			function (_p59, _p58) {
+				return _elm_lang$core$Result$Err('can\'t represent commands');
+			}),
+		parsers: _user$project$Command$Parsers(
+			{
+				ctor: '::',
+				_0: _user$project$Command$parseCommands,
+				_1: {ctor: '[]'}
+			})
+	};
+}();
 var _user$project$Command$fileConfig = function () {
 	var append = F2(
 		function (x, y) {
-			var _p58 = {ctor: '_Tuple2', _0: x, _1: y};
-			if (_p58._0.ctor === 'Stream') {
-				if (_p58._1.ctor === 'Stream') {
+			var _p60 = {ctor: '_Tuple2', _0: x, _1: y};
+			if (_p60._0.ctor === 'Stream') {
+				if (_p60._1.ctor === 'Stream') {
 					return _user$project$Command$Stream(
-						A2(_elm_lang$core$Basics_ops['++'], _p58._0._0, _p58._1._0));
+						A2(_elm_lang$core$Basics_ops['++'], _p60._0._0, _p60._1._0));
 				} else {
-					var _p59 = _p58._0._0;
+					var _p61 = _p60._0._0;
 					return A2(
 						_user$project$Command$Executable,
 						A2(
 							_elm_lang$core$Basics_ops['++'],
-							_p58._1._0,
+							_p60._1._0,
 							A2(
 								_elm_lang$core$Basics_ops['++'],
 								'(',
-								A2(_elm_lang$core$Basics_ops['++'], _p59, ')'))),
+								A2(_elm_lang$core$Basics_ops['++'], _p61, ')'))),
 						A2(
 							_user$project$Command$join,
-							A2(_user$project$Command$echo, _user$project$Command$fileConfig, _p59),
-							_p58._1._1));
+							A2(_user$project$Command$echo, _user$project$Command$fileConfig, _p61),
+							_p60._1._1));
 				}
 			} else {
-				if (_p58._1.ctor === 'Executable') {
+				if (_p60._1.ctor === 'Executable') {
 					return A2(
 						_user$project$Command$Executable,
 						A2(
 							_elm_lang$core$Basics_ops['++'],
-							_p58._0._0,
-							A2(_elm_lang$core$Basics_ops['++'], ':', _p58._1._0)),
-						A2(_user$project$Command$join, _p58._0._1, _p58._1._1));
+							_p60._0._0,
+							A2(_elm_lang$core$Basics_ops['++'], ':', _p60._1._0)),
+						A2(_user$project$Command$join, _p60._0._1, _p60._1._1));
 				} else {
-					return _user$project$Command$Stream(_p58._1._0);
+					return _user$project$Command$Stream(_p60._1._0);
 				}
 			}
 		});
-	var compile = F3(
-		function (name, system, input) {
-			var _p60 = input;
-			if (_p60.ctor === 'Executable') {
-				return _elm_lang$core$Result$Ok(
-					A2(_user$project$Command$Executable, name, _p60._1));
+	var compile = F2(
+		function (system, input) {
+			var _p62 = input;
+			if (_p62.ctor === 'Executable') {
+				return _elm_lang$core$Result$Ok(_p62._1);
 			} else {
-				var _p63 = _p60._0;
+				var _p65 = _p62._0;
 				return A2(
-					_elm_lang$core$Result$map,
-					function (x) {
-						return A2(_user$project$Command$Executable, name, x);
-					},
+					_elm_lang$core$Result$fromMaybe,
+					A2(_elm_lang$core$Basics_ops['++'], 'failed to parse ', _p65),
 					A2(
-						_elm_lang$core$Result$fromMaybe,
-						A2(_elm_lang$core$Basics_ops['++'], 'failed to parse ', _p63),
-						A2(
-							_elm_community$maybe_extra$Maybe_Extra$orElseLazy,
-							function (_p61) {
-								var _p62 = _p61;
-								return A3(_user$project$Command$parseFiles, _user$project$Command$fileConfig, system, _p63);
-							},
-							A3(
-								_user$project$Command$parse,
-								_user$project$Command$fileConfig,
-								system,
-								A3(_elm_community$string_extra$String_Extra$replace, '!', '|', _p63)))));
+						_elm_community$maybe_extra$Maybe_Extra$orElseLazy,
+						function (_p63) {
+							var _p64 = _p63;
+							return A3(_user$project$Command$parseFiles, _user$project$Command$fileConfig, system, _p65);
+						},
+						A3(
+							_user$project$Command$parse,
+							_user$project$Command$fileConfig,
+							system,
+							A3(_elm_community$string_extra$String_Extra$replace, '!', '|', _p65))));
 			}
 		});
 	var toCommand = function (x) {
-		var _p64 = x;
-		if (_p64.ctor === 'Executable') {
-			return _elm_lang$core$Maybe$Just(_p64._1);
+		var _p66 = x;
+		if (_p66.ctor === 'Executable') {
+			return _elm_lang$core$Maybe$Just(_p66._1);
 		} else {
 			return _elm_lang$core$Maybe$Nothing;
 		}
 	};
 	var toString = function (x) {
-		var _p65 = x;
-		if (_p65.ctor === 'Stream') {
-			return _p65._0;
+		var _p67 = x;
+		if (_p67.ctor === 'Stream') {
+			return _p67._0;
 		} else {
-			return A2(_elm_lang$core$Basics_ops['++'], 'Executable: ', _p65._0);
+			return A2(_elm_lang$core$Basics_ops['++'], 'Executable: ', _p67._0);
 		}
 	};
 	return {
@@ -21701,6 +21704,11 @@ var _user$project$Command$fileConfig = function () {
 		append: append,
 		toString: toString,
 		toCommand: toCommand,
+		fromCommand: F2(
+			function (name, a) {
+				return _elm_lang$core$Result$Ok(
+					A2(_user$project$Command$Executable, name, a));
+			}),
 		compile: compile,
 		parsers: _user$project$Command$Parsers(
 			{
@@ -22249,7 +22257,7 @@ var _user$project$App$init = function () {
 		return A2(
 			_user$project$FileSystem$unsafeAddFile,
 			name,
-			_user$project$Command$Stream(
+			_user$project$App$config.fromString(
 				_elm_lang$core$String$toUpper(name)));
 	};
 	var system = A3(_elm_lang$core$List$foldl, f, _user$project$FileSystem$emptySystem, _user$project$FileSystem$files);
