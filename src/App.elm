@@ -41,13 +41,13 @@ init =
             ]
 
         prehistory =
-            [ "echo \"echo lo ! append hello ! echo\" | spawn 99 kitty | echo"
+            [ "echo \"echo lo ! append hello ! echo \"\"\" | spawn 99 kitty"
             , "daemons"
             , "ls"
             ]
 
         buffer =
-            "echo cat | compile exe | write say | run hello"
+            "echo cat | compile exe | write say | apply hello"
 
         -- "echo \"echo 4\" | spawn 99 anon"
         -- "echo \"echo 4\" | compile anon | write exec"

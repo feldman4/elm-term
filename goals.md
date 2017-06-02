@@ -24,9 +24,44 @@ compile (expr)
 
 
 library:
+cd dir
+ls
+ls dir
+weird cat?
+- [string] | cat
+- cat [filename]
+
+custom run
+- case get XXX system of
+  - Ok (Executable f) -> run f
+also run (xxx) => load xxx into stdin
+
+exe file
+stream | exe
+
+[fcn] | write tmp | tmp arg | rm tmp
+
+pre
+app
+
+append arg string
+append two files
+- cat A | write AB | cat B | append AB
+
+restrict user to functions only by removing echo, no piping informative commands
+like ls and daemons? or use stderr
+
+
+
+compile name xxx => usual behavior on xxx
+xxx | compile name => usual behavior on xxx
+compile xxx ?? =!> doesn't work
+
+
+
 - ok: ls, cat, echo, pwd, cd, write
-- ok: spawn, daemons, kill
-- todo: compile, grep, xargs?
+- ok: compile, spawn, daemons, kill
+- todo: grep, xargs?
 
 
 ### execution

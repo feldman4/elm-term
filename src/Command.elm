@@ -77,7 +77,7 @@ fileConfig =
                     expr
                         |> String.Extra.replace "!" "|"
                         |> parse fileConfig system
-                        |> Maybe.Extra.orElseLazy (\() -> parseFiles fileConfig system expr)
+                        |> Maybe.Extra.orElseLazy (\() -> parseCmdFromFile fileConfig system expr)
                         |> Result.fromMaybe ("failed to parse " ++ expr)
 
         append x y =
@@ -103,7 +103,7 @@ fileConfig =
         , toCommand = toCommand
         , fromCommand = (\name a -> Ok (Executable name a))
         , compile = compile
-        , parsers = Parsers [ parseCommands, parseFiles ]
+        , parsers = Parsers [ parseCommands, parseCmdFromFile, parseCmdFromFileArg ]
         }
 
 
@@ -135,6 +135,9 @@ parse config system input =
 parseCommands : Config a -> FileSystem a -> String -> Maybe (IOCommand a)
 parseCommands config _ input =
     let
+        -- matchCommandArity1_ => takes config, automatically applies toString
+        --   when there is no parsed string
+        --  don't use for compile
         commands =
             [ -- navigate
               matchCommandArity0 "^$" doNothing
@@ -148,14 +151,18 @@ parseCommands config _ input =
               -- manipulate files
             , matchCommandArity1 "^echo\\s+\\\"(.*)\\\"$" (echo config)
             , matchCommandArity1 "^echo\\s+(.*)$" (echo config)
-            , matchCommandArity0 "^echo$" (echo config "")
-            , matchCommandArity0 "^cat$" catStdin
+            , matchCommandArity0 "^echo$" (echoStdin)
+            , matchCommandArity0 "^cat$" (catStdin config)
             , matchCommandArity1 "^cat\\s+([\\w|\\.|/]+)$" cat
             , matchCommandArity1 "^write\\s+([\\w|\\.\\*|/]+)$" write
             , matchCommandArity1 "^append\\s+([\\w|\\.|/]+)$" (append config)
             , matchCommandArity1 "^rm\\s+([\\w|\\.|/]+)$" (rm config)
               -- compile
             , matchCommandArity1 "^compile\\s+(\\w+)$" (compile config)
+              -- applies the command from stdin to the argument string
+            , matchCommandArity1 "^apply\\s+(\\w+)$" (apply config)
+            , matchCommandArity0 "^apply$" (apply config "")
+              -- runs the command from stdin on the argument file
             , matchCommandArity1 "^run\\s+(\\w+)$" (run config)
               -- daemons
             , matchCommandArity0 "^daemons$" (showDaemons config)
@@ -169,8 +176,8 @@ parseCommands config _ input =
 {-| How to deal with Stream String in a FileSystem a? Probably don't want to
 make that executable. Could add a filter in config.runnable.
 -}
-parseFiles : Config File -> FileSystem File -> String -> Maybe (IOCommand File)
-parseFiles config system input =
+parseCmdFromFile : Config File -> FileSystem File -> String -> Maybe (IOCommand File)
+parseCmdFromFile config system input =
     let
         isExecutable x =
             case x of
@@ -185,9 +192,32 @@ parseFiles config system input =
             |> Maybe.andThen isExecutable
 
 
+parseCmdFromFileArg : Config File -> FileSystem File -> String -> Maybe (IOCommand File)
+parseCmdFromFileArg config system input =
+    let
+        f x y cmd fileStream =
+            case ( cmd, fileStream ) of
+                ( Executable _ cmd_, file ) ->
+                    Ok (\_ system -> cmd_ file system)
+
+                ( Stream _, _ ) ->
+                    Err ("not a command " ++ x)
+    in
+        case input |> String.trim |> String.words of
+            x :: y :: [] ->
+                Result.map2 (f x y) (get x system) (get y system)
+                    |> Result.Extra.extract Err
+                    |> Result.toMaybe
+
+            _ ->
+                Err ("failed to parse " ++ input)
+                    |> Result.toMaybe
+
+
 manString : String
 manString =
     """
+  -- NAVIGATION --
   help           - print help to stdout
   l              - show directory contents
   ls             - show directory contents
@@ -198,6 +228,22 @@ manString =
   write [file]   - write stdin to file, if file doesn't exist
   append [file]  - append stdin to file, if file exists
   rm [file]      - remove file or directory
+
+  -- COMMANDS --
+  [cmd]          - run a saved command
+  [cmd] [file]   - run a saved command, replacing stdin with contents of file
+  [cmd] | [cmd]  - combine commands by piping stdout to stdin
+  compile [string]
+                 - create a command with given name from contents of stdin
+                     strings are parsed with the pipe symbol `|` replaced by `!`
+                     commands are renamed
+  apply [string] - run a command from stdin on input string
+  run [file]     - run a command from stdin on contents of file
+                   the following are equivalent if tmp does not exist
+                     echo [expr] | compile exe | run file
+                     echo [expr] | compile exe | write tmp | cat file | tmp | rm tmp
+
+  -- DAEMONS --
   daemons        - show running processes
   spawn [int] [string]
                  - create a process from an executable or by compiling a string,
@@ -206,14 +252,9 @@ manString =
                      echo "echo cat ! append hello" | spawn 1 catWriter
                      echo "echo cat" | write exe | cat exe | spawn 1 runOnce
   kill [string]  - kill process
-  [cmd] | [cmd]  - combine commands by piping stdout to stdin
-  compile [string]
-                 - create a command with given name from stdin, with the
-                   pipe symbol `|` replaced by `!`
-  run [file]     - run a command on the contents of a file
-                   the following are equivalent if tmp does not exist
-                     echo [expr] | compile exe | run file
-                     echo [expr] | compile exe | write tmp | cat file | tmp | rm tmp
+
+
+
 
 """ |> String.Extra.replace " " "\x2002"
 
@@ -390,11 +431,17 @@ cat name _ system =
         |> Result.map (\a -> ( a, system ))
 
 
+catStdin : Config a -> IOCommand a
+catStdin config stream system =
+    get (config.toString stream) system
+        |> Result.map (\x -> ( x, system ))
+
+
 {-| Mimics UNIX making this the identity command, could treat stdin as a file
 instead.
 -}
-catStdin : IOCommand a
-catStdin stream system =
+echoStdin : IOCommand a
+echoStdin stream system =
     Ok ( stream, system )
 
 
@@ -434,11 +481,19 @@ compile config name stream system =
         |> Result.map (\a -> ( a, system ))
 
 
+apply : Config a -> String -> IOCommand a
+apply config input stream system =
+    config.toCommand stream
+        |> Result.fromMaybe ("not a valid command " ++ (config.toString stream))
+        |> Result.map (\cmd -> cmd (config.fromString input) system)
+        |> Result.Extra.extract Err
+
+
 run : Config a -> String -> IOCommand a
 run config file stream system =
     config.toCommand stream
         |> Result.fromMaybe ("not a valid command " ++ (config.toString stream))
-        |> Result.map2 (\a cmd -> cmd a system) (get file system)
+        |> Result.map2 (\input cmd -> cmd input system) (get file system)
         |> Result.Extra.extract Err
 
 
